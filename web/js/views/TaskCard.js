@@ -2,11 +2,11 @@
 import { html, cx } from "../lib/html.js";
 import { useState } from "preact/hooks";
 import { Icon } from "../ui/icons.js";
-import { Checkbox, DifficultyBadge, PhaseBadge, StatusBadge, Progress, Badge } from "../ui/core.js";
+import { Checkbox, DifficultyBadge, PhaseBadge, StatusBadge, Progress, Badge, IconButton } from "../ui/core.js";
 import { Menu } from "../ui/overlay.js";
 import { dueLabel, todayISO, fmtDate, plural } from "../lib/format.js";
 import { isOverdue, isDueSoon, isStale, isDone, nextStep, orderedSteps, overdueDays, staleDaysOf, PHASES, PHASE_COLOR, PHASE_LABEL } from "../lib/rules.js";
-import { setTaskDone, toggleStep, confirmDialog, updateTask } from "../actions.js";
+import { setTaskDone, toggleStep, confirmDialog, updateTask, deleteTask, addSteps, deleteStep } from "../actions.js";
 import { setState } from "../lib/store.js";
 
 export function openTask(task) {
@@ -42,6 +42,7 @@ function PhasePicker({ task, readOnly }) {
 export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = false, compact = false }) {
   const [completing, setCompleting] = useState(false);
   const [expanded, setExpanded] = useState(showSteps);
+  const [newStep, setNewStep] = useState("");
   const today = todayISO();
   const overdue = isOverdue(task, today);
   const soon = !overdue && isDueSoon(task, today);
@@ -75,6 +76,16 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
     }
   };
 
+  const remove = async () => {
+    const ok = await confirmDialog({
+      title: "Excluir tarefa?",
+      text: `“${task.title}” e todo o seu conteúdo serão excluídos. Esta ação não pode ser desfeita.`,
+      confirmLabel: "Excluir",
+      danger: true,
+    });
+    if (ok) deleteTask(task.account_id, task.id);
+  };
+
   const checkboxLabel = done
     ? task.steps.length
       ? "Concluída — desmarque uma etapa para reabrir"
@@ -99,6 +110,7 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
         ${unread
           ? html`<${Badge} tone="accent" icon="message" title=${`${unread} comentário(s) não lido(s)`}>${unread}<//>`
           : null}
+        ${!readOnly ? html`<${IconButton} icon="trash" size="sm" danger label="Excluir tarefa" onClick=${remove} />` : null}
       </div>
 
       <div class="task-meta">
@@ -166,10 +178,32 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
                   onChange=${(value) => toggleStep(task.account_id, task.id, step.id, value)}
                 />
                 <span class="step-text">${step.text}</span>
+                ${!readOnly
+                  ? html`<${IconButton} icon="x" size="sm" class="step-remove" label=${`Remover etapa: ${step.text}`} onClick=${() => deleteStep(task.account_id, task.id, step.id)} />`
+                  : null}
               </li>`,
             )}
+            ${!readOnly
+              ? html`<li class="step step-add">
+                  <input
+                    class="input"
+                    placeholder="Adicionar etapa e pressionar Enter"
+                    aria-label="Adicionar etapa"
+                    maxLength=${500}
+                    value=${newStep}
+                    onInput=${(e) => setNewStep(e.currentTarget.value)}
+                    onKeyDown=${(e) => {
+                      if (e.key !== "Enter" || !newStep.trim()) return;
+                      addSteps(task.account_id, task.id, [newStep.trim()]);
+                      setNewStep("");
+                    }}
+                  />
+                </li>`
+              : null}
           </ul>`
-        : null}
+        : !task.steps.length && !readOnly && !compact
+          ? html`<div><button type="button" class="btn btn-ghost btn-sm" onClick=${() => setExpanded(true)}><${Icon} name="plus" size=${16} />Etapas</button></div>`
+          : null}
     </div>
   </article>`;
 }
