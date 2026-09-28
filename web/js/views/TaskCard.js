@@ -3,13 +3,40 @@ import { html, cx } from "../lib/html.js";
 import { useState } from "preact/hooks";
 import { Icon } from "../ui/icons.js";
 import { Checkbox, DifficultyBadge, PhaseBadge, StatusBadge, Progress, Badge } from "../ui/core.js";
+import { Menu } from "../ui/overlay.js";
 import { dueLabel, todayISO, fmtDate, plural } from "../lib/format.js";
-import { isOverdue, isDueSoon, isStale, isDone, nextStep, orderedSteps, overdueDays, staleDaysOf } from "../lib/rules.js";
-import { setTaskDone, toggleStep, confirmDialog } from "../actions.js";
+import { isOverdue, isDueSoon, isStale, isDone, nextStep, orderedSteps, overdueDays, staleDaysOf, PHASES, PHASE_COLOR, PHASE_LABEL } from "../lib/rules.js";
+import { setTaskDone, toggleStep, confirmDialog, updateTask } from "../actions.js";
 import { setState } from "../lib/store.js";
 
 export function openTask(task) {
   setState({ drawer: { taskId: task.id, accountId: task.account_id } });
+}
+
+function PhasePicker({ task, readOnly }) {
+  if (readOnly) return html`<${PhaseBadge} value=${task.phase} short />`;
+  const current = PHASES.find((p) => p.key === task.phase);
+  return html`<${Menu}
+    align="left"
+    header=${html`<div class="menu-header xsmall faint">Mudar fase</div>`}
+    trigger=${(props) => html`<button
+      type="button"
+      class=${cx("badge", "badge-btn", `phase-${task.phase}`)}
+      title="Alterar fase"
+      aria-label=${`Fase: ${PHASE_LABEL[task.phase]}. Alterar fase`}
+      aria-haspopup=${props["aria-haspopup"]}
+      aria-expanded=${props["aria-expanded"]}
+      onClick=${props.toggle}
+    >
+      <span class="dot" aria-hidden="true"></span>${current?.short}<${Icon} name="chevronDown" />
+    </button>`}
+    items=${PHASES.map((p) => ({
+      label: p.label,
+      dot: PHASE_COLOR[p.key],
+      checked: p.key === task.phase,
+      onClick: () => p.key !== task.phase && updateTask(task.account_id, task.id, { phase: p.key }),
+    }))}
+  />`;
 }
 
 export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = false, compact = false }) {
@@ -76,7 +103,7 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
 
       <div class="task-meta">
         <${DifficultyBadge} value=${task.difficulty} />
-        ${!compact ? html`<${PhaseBadge} value=${task.phase} short />` : null}
+        ${!compact ? html`<${PhasePicker} task=${task} readOnly=${readOnly} />` : null}
         ${overdue
           ? html`<${StatusBadge} kind="critical" icon="alert">Atrasada há ${plural(overdueDays(task, today), "dia", "dias")}<//>`
           : soon

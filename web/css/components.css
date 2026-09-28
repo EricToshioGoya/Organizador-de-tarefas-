@@ -1014,6 +1014,24 @@ input[type="time"].input {
   color: var(--badge-color);
 }
 
+.badge-btn {
+  cursor: pointer;
+  font-family: inherit;
+  padding-right: 6px;
+  gap: 5px;
+}
+
+.badge-btn:hover,
+.badge-btn[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--badge-color) 60%, #ffffff);
+}
+
+.task-meta .badge-btn svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-3);
+}
+
 .next-step {
   display: flex;
   align-items: center;
@@ -1421,6 +1439,14 @@ input[type="time"].input {
 .menu-item:focus-visible {
   background: var(--surface-hover);
   outline: none;
+}
+
+.menu-item .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: var(--dot-ring);
+  flex-shrink: 0;
 }
 
 .menu-item.danger,
