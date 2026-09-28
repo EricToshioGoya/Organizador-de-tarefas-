@@ -1,0 +1,18 @@
+[project]
+name = "organizador-de-tarefas"
+version = "1.2.0"
+description = "Organizador de tarefas da equipe: etapas, metas, fases, dashboard de desempenho e perfil Gestor."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
