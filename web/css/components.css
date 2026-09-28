@@ -1072,6 +1072,20 @@ input[type="time"].input {
   gap: 2px;
 }
 
+.inline-steps .step-remove {
+  color: var(--text-3);
+  opacity: 0.55;
+}
+
+.inline-steps .step:hover .step-remove,
+.inline-steps .step-remove:focus-visible {
+  opacity: 1;
+}
+
+.inline-steps .step-add .input {
+  height: 38px;
+}
+
 /* ------------------------------------------------------------------------------------------
    Etapas (RF07–RF11)
    ------------------------------------------------------------------------------------------ */
