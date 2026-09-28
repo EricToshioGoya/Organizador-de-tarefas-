@@ -184,7 +184,8 @@ export function Menu({ trigger, items, align = "right", header }) {
                 : html`<button
                     key=${index}
                     type="button"
-                    role="menuitem"
+                    role=${item.checked === undefined ? "menuitem" : "menuitemradio"}
+                    aria-checked=${item.checked === undefined ? undefined : String(item.checked)}
                     class=${cx("menu-item", item.danger && "danger")}
                     disabled=${item.disabled}
                     onClick=${() => {
@@ -193,8 +194,10 @@ export function Menu({ trigger, items, align = "right", header }) {
                     }}
                   >
                     ${item.icon ? html`<${Icon} name=${item.icon} />` : null}
+                    ${item.dot ? html`<span class="dot" style=${`background:${item.dot}`} aria-hidden="true"></span>` : null}
                     <span class="grow">${item.label}</span>
                     ${item.hint ? html`<span class="xsmall faint">${item.hint}</span>` : null}
+                    ${item.checked ? html`<${Icon} name="check" />` : null}
                   </button>`,
             )}
         </div><//>`
