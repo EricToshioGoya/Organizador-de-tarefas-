@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light" />
+    <meta name="description" content="Organizador de tarefas da equipe: etapas, metas, fases, dashboard de desempenho e acompanhamento do Gestor." />
+    <title>Organizador de Tarefas</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Tarefas" />
+    <link rel="stylesheet" href="/css/tokens.css" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/components.css" />
+    <script type="importmap">{"imports":{"preact":"/vendor/preact.module.js","preact/hooks":"/vendor/hooks.module.js","htm":"/vendor/htm.module.js"}}</script>
+    <link rel="modulepreload" href="/vendor/preact.module.js" />
+    <link rel="modulepreload" href="/vendor/hooks.module.js" />
+    <link rel="modulepreload" href="/vendor/htm.module.js" />
+    <link rel="modulepreload" href="/js/main.js" />
+    <link rel="modulepreload" href="/js/actions.js" />
+    <link rel="modulepreload" href="/js/views/App.js" />
+    <script type="module" src="/js/main.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div class="picker" aria-busy="true" aria-label="Carregando">
+        <div class="brand-mark" style="width:44px;height:44px;border-radius:13px"></div>
+      </div>
+    </div>
+    <noscript>
+      <p style="padding:24px;color:#1d1d1b;font-family:system-ui">O Organizador de Tarefas precisa de JavaScript habilitado.</p>
+    </noscript>
+  </body>
+</html>
