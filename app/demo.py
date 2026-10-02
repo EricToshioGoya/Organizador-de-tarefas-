@@ -105,6 +105,7 @@ def seed(tasks_per_member: int = 200, seed_value: int = 42) -> dict:
                     title, description = rng.choice(TOPICS)
                     difficulty = rng.choices(["facil", "medio", "dificil"], [0.35, 0.45, 0.2])[0]
                     effort = {"facil": 2, "medio": 5, "dificil": 9}[difficulty]
+                    priority = rng.choices(["baixa", "media", "alta", "muito_alta"], [0.25, 0.4, 0.25, 0.1])[0]
                     due = created + timedelta(days=rng.randint(1, effort * 2 + 3)) if rng.random() < 0.85 else None
                     steps = rng.choice(STEPS)
                     goal = rng.choice(goals) if rng.random() < 0.3 else None
@@ -115,6 +116,7 @@ def seed(tasks_per_member: int = 200, seed_value: int = 42) -> dict:
                             "title": f"{title} #{i + 1}",
                             "description": description,
                             "difficulty": difficulty,
+                            "priority": priority,
                             "due_date": due.date().isoformat() if due else None,
                             "requester": rng.choice(REQUESTERS) if rng.random() < 0.8 else "",
                             "goal_id": goal.id if goal else None,

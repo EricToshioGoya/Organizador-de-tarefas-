@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Eventos (fonte da verdade) + projeções (modelos de leitura reconstruíveis a partir dos eventos).
 SCHEMA = """
@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     title TEXT NOT NULL,
     description TEXT NOT NULL DEFAULT '',
     difficulty TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'media',
     due_date TEXT,
     requester TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
@@ -206,6 +207,13 @@ def connect(path: Path | str) -> sqlite3.Connection:
     return conn
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Colunas novas em bancos criados por versões anteriores (o CREATE TABLE IF NOT EXISTS não as adiciona)."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+    if "priority" not in columns:
+        conn.execute("ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'media'")
+
+
 def init_db(path: Path | str) -> None:
     db_path = Path(path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -213,6 +221,7 @@ def init_db(path: Path | str) -> None:
     try:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        _migrate(conn)
         conn.execute(
             "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",

@@ -29,6 +29,7 @@ FIELD_LABELS = {
     "title": "título",
     "name": "nome",
     "difficulty": "dificuldade",
+    "priority": "prioridade",
     "due_date": "data de entrega",
     "target_date": "data-alvo",
     "phase": "fase",

@@ -41,6 +41,7 @@ def task_json(task: Task, attachments: list[dict] | None = None, comments: dict 
         "title": task.title,
         "description": task.description,
         "difficulty": task.difficulty,
+        "priority": task.priority,
         "due_date": date_iso(task.due_date),
         "requester": task.requester,
         "created_at": to_iso(task.created_at),

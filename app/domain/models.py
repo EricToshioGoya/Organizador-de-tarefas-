@@ -8,6 +8,7 @@ from datetime import date, datetime
 from .constants import (
     DEFAULT_DIFFICULTY,
     DEFAULT_PHASE,
+    DEFAULT_PRIORITY,
     DONE,
     GOAL_ACTIVE,
     GOAL_DONE,
@@ -34,6 +35,7 @@ class Task:
     title: str
     created_at: datetime
     difficulty: str = DEFAULT_DIFFICULTY
+    priority: str = DEFAULT_PRIORITY
     description: str = ""
     due_date: date | None = None
     requester: str = ""

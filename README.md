@@ -74,7 +74,7 @@ feeds da rede interna; o Google Agenda só lê endereços públicos na internet.
 .\run.ps1 -Test
 ```
 
-São 114 testes (pytest) cobrindo regras de negócio, métricas, previsões, integrações e fluxos completos da
+São 116 testes (pytest) cobrindo regras de negócio, métricas, previsões, integrações e fluxos completos da
 API. Cobertura: 95% no total e ~99% nos módulos de regras (`app/domain`) e métricas (`app/metrics`).
 
 ## Arquitetura (RNF14, RNF22)
@@ -132,6 +132,10 @@ Pontos em que a especificação admite mais de uma leitura. A regra adotada est�
     (RN20); de outra conta, a opção é *Copiar para minhas tarefas*. Ao digitar o título de uma nova tarefa, o
     formulário sugere reaproveitar as etapas de tarefas parecidas. A API de templates continua disponível, e
     os modelos salvos antes dessa mudança aparecem entre as sugestões.
+13. **Prioridade e ordenação (substitui a ordem por entrega do RF14).** Cada tarefa tem prioridade Baixa, Média,
+    Alta ou Muito alta (padrão Média, inclusive para as tarefas já existentes). As pendentes são ordenadas só pela
+    prioridade (Muito alta primeiro); no empate, a criada antes vem primeiro. A prioridade e a descrição aparecem
+    no cartão e podem ser alteradas ali mesmo (menu da prioridade; clique na descrição para editar).
 
 ## Dados de demonstração
 

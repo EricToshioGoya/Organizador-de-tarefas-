@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Difficulty = Literal["facil", "medio", "dificil"]
+Priority = Literal["baixa", "media", "alta", "muito_alta"]
 Phase = Literal["planejamento", "producao", "alpha", "beta", "concluido"]
 Role = Literal["membro", "gestor"]
 PostponeReason = Literal["subestimei", "prioridade", "dependencia", "outro"]
@@ -54,6 +55,7 @@ class TaskCreate(Model):
     title: str = Field(..., examples=["Apresentação do projeto"])
     description: str = ""
     difficulty: Difficulty = "medio"
+    priority: Priority = Field("media", description="Ordena as pendentes: Muito alta primeiro.")
     due_date: date | None = None
     requester: str = ""
     goal_id: str | None = None
@@ -69,6 +71,7 @@ class TaskUpdate(Model):
     title: str | None = None
     description: str | None = None
     difficulty: Difficulty | None = None
+    priority: Priority | None = None
     due_date: date | None = Field(None, description="null remove a data de entrega.")
     due_reason: PostponeReason | None = Field(None, description="Obrigatório ao adiar a entrega (RN21, RF47).")
     due_reason_text: str | None = Field(None, description="Obrigatório quando o motivo é 'outro'.")
@@ -211,6 +214,7 @@ class TaskOut(BaseModel):
     title: str
     description: str
     difficulty: Difficulty
+    priority: Priority
     due_date: str | None
     requester: str
     created_at: str

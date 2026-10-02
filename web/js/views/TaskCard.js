@@ -1,11 +1,28 @@
 // Cartão de tarefa (RF13, RF15, RF45, RF49, RF58, RF65, RF67) com marcação direta (RF40).
 import { html, cx } from "../lib/html.js";
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { Icon } from "../ui/icons.js";
-import { Checkbox, DifficultyBadge, PhaseBadge, StatusBadge, Progress, Badge, IconButton } from "../ui/core.js";
+import { Checkbox, DifficultyBadge, PhaseBadge, PriorityBadge, StatusBadge, Progress, Badge, IconButton, priorityText } from "../ui/core.js";
+import { AutoText } from "../ui/forms.js";
 import { Menu } from "../ui/overlay.js";
 import { dueLabel, todayISO, fmtDate, plural } from "../lib/format.js";
-import { isOverdue, isDueSoon, isStale, isDone, nextStep, orderedSteps, overdueDays, staleDaysOf, PHASES, PHASE_COLOR, PHASE_LABEL } from "../lib/rules.js";
+import {
+  isOverdue,
+  isDueSoon,
+  isStale,
+  isDone,
+  nextStep,
+  orderedSteps,
+  overdueDays,
+  priorityOf,
+  staleDaysOf,
+  PHASES,
+  PHASE_COLOR,
+  PHASE_LABEL,
+  PRIORITIES,
+  PRIORITY_COLOR,
+  PRIORITY_LABEL,
+} from "../lib/rules.js";
 import { setTaskDone, toggleStep, confirmDialog, updateTask, deleteTask, addSteps, deleteStep } from "../actions.js";
 import { setState } from "../lib/store.js";
 
@@ -39,10 +56,108 @@ function PhasePicker({ task, readOnly }) {
   />`;
 }
 
+function PriorityPicker({ task, readOnly }) {
+  const current = priorityOf(task);
+  if (readOnly) return html`<${PriorityBadge} value=${current} />`;
+  return html`<${Menu}
+    align="left"
+    header=${html`<div class="menu-header xsmall faint">Mudar prioridade</div>`}
+    trigger=${(props) => html`<button
+      type="button"
+      class=${cx("badge", "badge-btn", `prio-${current}`)}
+      title="Alterar prioridade"
+      aria-label=${`Prioridade: ${PRIORITY_LABEL[current]}. Alterar prioridade`}
+      aria-haspopup=${props["aria-haspopup"]}
+      aria-expanded=${props["aria-expanded"]}
+      onClick=${props.toggle}
+    >
+      <${Icon} name="flag" class="prio-flag" />${priorityText(current)}<${Icon} name="chevronDown" />
+    </button>`}
+    items=${[...PRIORITIES].reverse().map((p) => ({
+      label: p.label,
+      dot: PRIORITY_COLOR[p.key],
+      checked: p.key === current,
+      onClick: () => p.key !== current && updateTask(task.account_id, task.id, { priority: p.key }),
+    }))}
+  />`;
+}
+
+/** Descrição no cartão: prévia de 2 linhas com "Ver mais"; um clique abre a edição ali mesmo (salva sozinha). */
+function TaskDescription({ task, readOnly, editing, setEditing }) {
+  const [open, setOpen] = useState(false);
+  const [overflow, setOverflow] = useState(false);
+  const textRef = useRef(null);
+  const editorRef = useRef(null);
+  const text = task.description || "";
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el || open) return undefined;
+    const check = () => setOverflow(el.scrollHeight > el.clientHeight + 1);
+    check();
+    const observer = new ResizeObserver(check);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [text, open, editing]);
+
+  useEffect(() => {
+    const field = editing && editorRef.current?.querySelector("textarea");
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  }, [editing]);
+
+  // Chaves distintas: se o Preact reaproveitasse a <div> da prévia, o foco saindo dela (removida) fecharia o editor.
+  if (editing && !readOnly) {
+    return html`<div
+      key="editor"
+      class="task-desc-editor"
+      ref=${editorRef}
+      onFocusOut=${(e) => !e.currentTarget.contains(e.relatedTarget) && setEditing(false)}
+      onKeyDown=${(e) => e.key === "Escape" && e.target.blur()}
+    >
+      <${AutoText}
+        multiline
+        rows=${3}
+        value=${text}
+        ariaLabel=${`Descrição de ${task.title}`}
+        placeholder="Contexto, critérios de aceite…"
+        draftKey=${`desc:${task.id}`}
+        onSave=${(value) => updateTask(task.account_id, task.id, { description: value })}
+      />
+    </div>`;
+  }
+  if (!text.trim()) return null;
+  const edit = () => setEditing(true);
+  return html`<div key="preview" class="task-desc">
+    <div
+      ref=${textRef}
+      class=${cx("task-desc-text", !open && "clamped", !readOnly && "editable")}
+      role=${readOnly ? undefined : "button"}
+      tabIndex=${readOnly ? undefined : 0}
+      title=${readOnly ? undefined : "Editar descrição"}
+      onClick=${readOnly ? undefined : edit}
+      onKeyDown=${readOnly
+        ? undefined
+        : (e) => {
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            edit();
+          }}
+    >${text}</div>
+    ${open || overflow
+      ? html`<button type="button" class="task-desc-toggle" aria-expanded=${open ? "true" : "false"} onClick=${() => setOpen(!open)}>
+          ${open ? "Ver menos" : "Ver mais"}
+        </button>`
+      : null}
+  </div>`;
+}
+
 export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = false, compact = false }) {
   const [completing, setCompleting] = useState(false);
   const [expanded, setExpanded] = useState(showSteps);
   const [newStep, setNewStep] = useState("");
+  const [editingDesc, setEditingDesc] = useState(false);
   const today = todayISO();
   const overdue = isOverdue(task, today);
   const soon = !overdue && isDueSoon(task, today);
@@ -52,6 +167,7 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
   const goal = goals?.find((g) => g.id === task.goal_id);
   const isNew = !!task.assigned_by && !task.assigned_seen_at && !readOnly;
   const unread = task.comments?.unread || 0;
+  const hasDesc = !!task.description?.trim();
 
   const toggleTask = async (checked) => {
     if (readOnly) return;
@@ -113,7 +229,10 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
         ${!readOnly ? html`<${IconButton} icon="trash" size="sm" danger label="Excluir tarefa" onClick=${remove} />` : null}
       </div>
 
+      <${TaskDescription} task=${task} readOnly=${readOnly} editing=${editingDesc} setEditing=${setEditingDesc} />
+
       <div class="task-meta">
+        <${PriorityPicker} task=${task} readOnly=${readOnly} />
         <${DifficultyBadge} value=${task.difficulty} />
         ${!compact ? html`<${PhasePicker} task=${task} readOnly=${readOnly} />` : null}
         ${overdue
@@ -201,9 +320,18 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
                 </li>`
               : null}
           </ul>`
-        : !task.steps.length && !readOnly && !compact
-          ? html`<div><button type="button" class="btn btn-ghost btn-sm" onClick=${() => setExpanded(true)}><${Icon} name="plus" size=${16} />Etapas</button></div>`
-          : null}
+        : null}
+
+      ${!readOnly && !compact && ((!task.steps.length && !expanded) || (!hasDesc && !editingDesc))
+        ? html`<div class="row">
+            ${!task.steps.length && !expanded
+              ? html`<button type="button" class="btn btn-ghost btn-sm" onClick=${() => setExpanded(true)}><${Icon} name="plus" size=${16} />Etapas</button>`
+              : null}
+            ${!hasDesc && !editingDesc
+              ? html`<button type="button" class="btn btn-ghost btn-sm" onClick=${() => setEditingDesc(true)}><${Icon} name="plus" size=${16} />Descrição</button>`
+              : null}
+          </div>`
+        : null}
     </div>
   </article>`;
 }

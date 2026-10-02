@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from ..domain.constants import DIFFICULTY_LABELS, PHASE_LABELS, POSTPONE_REASONS
+from ..domain.constants import DIFFICULTY_LABELS, PHASE_LABELS, POSTPONE_REASONS, PRIORITY_LABELS
 from ..domain.timeutil import fmt_date_br, parse_date, parse_iso
 
 MERGE_WINDOW = timedelta(minutes=10)
@@ -38,6 +38,8 @@ def _describe_edit(changes: dict) -> tuple[str, str | None]:
             parts.append(f"Solicitante: {new or '—'}")
         elif field == "difficulty":
             parts.append(f"Dificuldade: {DIFFICULTY_LABELS.get(old, old)} → {DIFFICULTY_LABELS.get(new, new)}")
+        elif field == "priority":
+            parts.append(f"Prioridade: {PRIORITY_LABELS.get(old, old)} → {PRIORITY_LABELS.get(new, new)}")
         elif field == "links":
             added = [u for u in new or [] if u not in (old or [])]
             removed = [u for u in old or [] if u not in (new or [])]

@@ -14,6 +14,7 @@ from ..domain import rules
 from ..domain.constants import (
     DEFAULT_DIFFICULTY,
     DEFAULT_PHASE,
+    DEFAULT_PRIORITY,
     DONE,
     GOAL_DONE,
     TEXT_MAX,
@@ -250,6 +251,7 @@ def create_task(ctx: Ctx, account_id: str, data: dict) -> Task:
         "title": rules.clean_title(data.get("title")),
         "description": rules.clean_text(data.get("description") or "", TEXT_MAX),
         "difficulty": rules.check_difficulty(data.get("difficulty") or DEFAULT_DIFFICULTY),
+        "priority": rules.check_priority(data.get("priority") or DEFAULT_PRIORITY),
         "due_date": date_iso(_date(data.get("due_date"), "Data de entrega")),  # type: ignore[arg-type]
         "requester": requester,
         "goal_id": goal.id if goal else None,
@@ -285,6 +287,7 @@ def update_task(ctx: Ctx, task_id: str, changes: dict) -> Task:
         "notes": lambda v: rules.clean_text(v or "", TEXT_MAX),
         "requester": lambda v: rules.clean_text(v or "", REQUESTER_MAX, multiline=False),
         "difficulty": rules.check_difficulty,
+        "priority": rules.check_priority,
         "links": lambda v: rules.clean_links(v or []),
     }
     for field, clean in cleaners.items():

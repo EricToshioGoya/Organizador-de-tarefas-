@@ -1,7 +1,7 @@
 // Componentes básicos do design system (RNF06, RNF12).
 import { html, cx } from "../lib/html.js";
 import { Icon } from "./icons.js";
-import { DIFFICULTY_LABEL, PHASE_LABEL, PHASES } from "../lib/rules.js";
+import { DIFFICULTY_LABEL, PHASE_LABEL, PHASES, PRIORITY_LABEL } from "../lib/rules.js";
 
 export function Button({ variant, size, block, icon, iconRight, loading, children, class: className, type = "button", ...rest }) {
   const iconSize = size === "sm" ? 16 : 18;
@@ -33,6 +33,15 @@ export function IconButton({ icon, label, size, danger, class: className, iconSi
 export function DifficultyBadge({ value }) {
   return html`<span class=${cx("badge", `diff-${value}`)} title=${`Dificuldade: ${DIFFICULTY_LABEL[value]}`}>
     <span class="dot" aria-hidden="true"></span>${DIFFICULTY_LABEL[value]}
+  </span>`;
+}
+
+/** Texto do selo: "Prioridade alta" (só "Alta" se confundiria com a dificuldade "Médio"). */
+export const priorityText = (value) => `Prioridade ${PRIORITY_LABEL[value].toLowerCase()}`;
+
+export function PriorityBadge({ value }) {
+  return html`<span class=${cx("badge", `prio-${value}`)} title=${`Prioridade: ${PRIORITY_LABEL[value]}`}>
+    <${Icon} name="flag" />${priorityText(value)}
   </span>`;
 }
 
