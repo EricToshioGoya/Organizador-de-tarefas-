@@ -16,7 +16,7 @@ from .events import dumps, iter_events
 Handler = Callable[[sqlite3.Connection, dict, dict], None]
 HANDLERS: dict[str, Handler] = {}
 
-TASK_TEXT_FIELDS = {"title", "description", "difficulty", "requester", "notes", "links"}
+TASK_TEXT_FIELDS = {"title", "description", "difficulty", "priority", "requester", "notes", "links"}
 GOAL_FIELDS = {"title", "description", "target_date"}
 TEMPLATE_FIELDS = {"name", "title", "description", "difficulty", "steps"}
 
@@ -144,18 +144,19 @@ def _account_deleted(conn, ev, p):
 @handles("TarefaCriada")
 def _task_created(conn, ev, p):
     ts = ev["occurred_at"]
-    stamps = {name: ts for name in ("title", "description", "difficulty", "requester", "notes", "links", "due_date", "phase", "goal_id", "status")}
+    stamps = {name: ts for name in ("title", "description", "difficulty", "priority", "requester", "notes", "links", "due_date", "phase", "goal_id", "status")}
     conn.execute(
-        "INSERT INTO tasks(id, account_id, title, description, difficulty, due_date, requester, created_at, "
+        "INSERT INTO tasks(id, account_id, title, description, difficulty, priority, due_date, requester, created_at, "
         "completed_at, status, goal_id, notes, links, phase, last_activity_at, due_history, assigned_by, "
         "assigned_by_name, assigned_seen_at, field_ts, version) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pendente', ?, ?, ?, ?, ?, '[]', ?, ?, NULL, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'pendente', ?, ?, ?, ?, ?, '[]', ?, ?, NULL, ?, ?)",
         (
             ev["aggregate_id"],
             ev["account_id"],
             p["title"],
             p.get("description", ""),
             p["difficulty"],
+            p.get("priority", "media"),  # eventos anteriores à prioridade
             p.get("due_date"),
             p.get("requester", ""),
             ts,

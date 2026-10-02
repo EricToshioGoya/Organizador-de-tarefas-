@@ -45,6 +45,11 @@
   --diff-facil: #16a34a;
   --diff-medio: #eab308;
   --diff-dificil: #dc2626;
+  /* Prioridade — do cinza (Baixa) ao vermelho (Muito alta); no selo, com ícone de bandeira */
+  --prio-baixa: #94a3b8;
+  --prio-media: #2a78d6;
+  --prio-alta: #f97316;
+  --prio-muito_alta: #dc2626;
   /* Fase — do amarelo claro ao vermelho intenso; só Concluído é verde */
   --phase-planejamento: #fde047;
   --phase-producao: #f59e0b;

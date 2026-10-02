@@ -148,8 +148,13 @@ def test_stale_days_validation():
 
 
 def test_sorting():
-    late, soon, none = task(due=TODAY - timedelta(days=1)), task(due=TODAY + timedelta(days=1)), task()
-    assert rules.sort_pending([none, soon, late]) == [late, soon, none]
+    low = task(priority="baixa", due=TODAY - timedelta(days=5))
+    top = task(priority="muito_alta")
+    high = task(priority="alta", due=TODAY + timedelta(days=9))
+    older = task(created=NOW - timedelta(days=20))
+    newer = task(created=NOW - timedelta(days=1), due=TODAY)
+    # Prioridade primeiro (o prazo não conta); no empate, a criada antes vem primeiro.
+    assert rules.sort_pending([low, newer, high, older, top]) == [top, high, older, newer, low]
     old, recent = task(completed=NOW - timedelta(days=2)), task(completed=NOW)
     assert rules.sort_done([old, recent]) == [recent, old]
 

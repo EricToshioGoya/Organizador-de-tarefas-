@@ -13,7 +13,7 @@ import { api } from "../lib/api.js";
 import { uid } from "../lib/ids.js";
 import { useStore, getState } from "../lib/store.js";
 import { loadDraft, saveDraft, clearDraft } from "../lib/drafts.js";
-import { DIFFICULTIES, DIFFICULTY_LABEL, PHASES, TITLE_MAX, normalizeText, orderedSteps } from "../lib/rules.js";
+import { DIFFICULTIES, DIFFICULTY_LABEL, PHASES, PRIORITIES, TITLE_MAX, normalizeText, orderedSteps } from "../lib/rules.js";
 import { fmtDate, fmtNumber, plural } from "../lib/format.js";
 import { closeModal, createTask, ensureBoard } from "../actions.js";
 
@@ -21,6 +21,7 @@ const EMPTY = {
   title: "",
   description: "",
   difficulty: "medio",
+  priority: "media",
   due_date: null,
   requester: "",
   goal_id: null,
@@ -298,6 +299,14 @@ export function TaskFormModal({ accountId, preset = {}, assign = false, duplicat
               value=${form.difficulty}
               options=${DIFFICULTIES.map((d) => ({ value: d.key, label: d.label, dot: `var(--diff-${d.key})` }))}
               onChange=${(value) => update({ difficulty: value })}
+            />
+          <//>
+          <${Field} label="Prioridade" class="span-2">
+            <${Segmented}
+              label="Prioridade"
+              value=${form.priority}
+              options=${PRIORITIES.map((p) => ({ value: p.key, label: p.label, dot: `var(--prio-${p.key})` }))}
+              onChange=${(value) => update({ priority: value })}
             />
           <//>
           <${Field} label="Data de entrega" id=${ids.due}>

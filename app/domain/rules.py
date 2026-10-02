@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo
 from .constants import (
     ACCOUNT_COLORS,
     COMMENT_MAX,
+    DEFAULT_PRIORITY,
     DEFAULT_STALE_DAYS,
     DIFFICULTIES,
     DIFFICULTY_POINTS,
@@ -24,6 +25,8 @@ from .constants import (
     PENDING,
     PHASES,
     POSTPONE_REASONS,
+    PRIORITIES,
+    PRIORITY_RANK,
     ROLES,
     STEP_MAX,
     TEXT_MAX,
@@ -136,6 +139,12 @@ def clean_links(values: Iterable[object]) -> list[str]:
 def check_difficulty(value: object) -> str:
     if value not in DIFFICULTIES:
         raise DomainError("Dificuldade inválida: use Fácil, Médio ou Difícil.", code="dificuldade_invalida")
+    return str(value)
+
+
+def check_priority(value: object) -> str:
+    if value not in PRIORITIES:
+        raise DomainError("Prioridade inválida: use Baixa, Média, Alta ou Muito alta.", code="prioridade_invalida")
     return str(value)
 
 
@@ -324,8 +333,8 @@ def is_stale(task: Task, now: datetime, stale_days: int = DEFAULT_STALE_DAYS) ->
 
 
 def sort_pending(tasks: Iterable[Task]) -> list[Task]:
-    """Pendentes por data de entrega (mais próxima primeiro); sem data ao final."""
-    return sorted(tasks, key=lambda t: (t.due_date is None, t.due_date or date.max, t.created_at))
+    """Pendentes por prioridade (Muito alta primeiro); no empate, a criada antes vem primeiro."""
+    return sorted(tasks, key=lambda t: (PRIORITY_RANK.get(t.priority, PRIORITY_RANK[DEFAULT_PRIORITY]), t.created_at))
 
 
 def sort_done(tasks: Iterable[Task]) -> list[Task]:

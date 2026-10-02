@@ -52,6 +52,7 @@ def task_from_row(row: sqlite3.Row, steps: list[Step] | None = None) -> Task:
         title=row["title"],
         created_at=parse_iso(row["created_at"]),
         difficulty=row["difficulty"],
+        priority=row["priority"],
         description=row["description"],
         due_date=parse_date(row["due_date"]),
         requester=row["requester"],

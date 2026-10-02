@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date, timedelta
 
 import pytest
@@ -71,6 +72,7 @@ def test_task_crud_and_validation(api):
     ana = api.account("Ana")
     task = api.task(ana["id"], title="Relatório", description="Mensal", due_date="2026-10-01", requester="Carlos", links=["exemplo.com"], steps=["A", {"text": "B"}, "  "])
     assert task["difficulty"] == "medio" and task["phase"] == "planejamento" and task["status"] == "pendente"
+    assert task["priority"] == "media"
     assert [s["text"] for s in task["steps"]] == ["A", "B"]
     assert task["links"] == ["https://exemplo.com"]
     assert task["comments"] == {"total": 0, "unread": 0}
@@ -79,6 +81,8 @@ def test_task_crud_and_validation(api):
     assert bad.status_code == 422 and bad.json()["detail"] == "O título é obrigatório."
     invalid = api.post(f"/api/accounts/{ana['id']}/tasks", ana["id"], json={"title": "x", "difficulty": "extrema"})
     assert invalid.status_code == 422 and "dificuldade" in invalid.json()["detail"]
+    invalid = api.patch(f"/api/tasks/{task['id']}", ana["id"], json={"priority": "urgente"})
+    assert invalid.status_code == 422 and "prioridade" in invalid.json()["detail"]
 
     edited = api.patch(f"/api/tasks/{task['id']}", ana["id"], json={"title": "Relatório final", "phase": "beta", "difficulty": "dificil", "notes": "ok"}).json()
     assert (edited["title"], edited["phase"], edited["difficulty"], edited["notes"]) == ("Relatório final", "beta", "dificil", "ok")
@@ -86,6 +90,40 @@ def test_task_crud_and_validation(api):
     assert api.delete(f"/api/tasks/{task['id']}", ana["id"]).status_code == 204
     assert api.get(f"/api/tasks/{task['id']}").status_code == 404
     assert api.delete(f"/api/tasks/{task['id']}", ana["id"]).status_code == 204  # idempotente
+
+
+def test_priority_is_editable_and_logged(api):
+    ana = api.account("Ana")
+    task = api.task(ana["id"], priority="alta")
+    assert task["priority"] == "alta"
+    edited = api.patch(f"/api/tasks/{task['id']}", ana["id"], json={"priority": "muito_alta"}).json()
+    assert edited["priority"] == "muito_alta"
+    board = api.get(f"/api/accounts/{ana['id']}/board", ana["id"]).json()
+    assert board["tasks"][0]["priority"] == "muito_alta"
+    timeline = api.get(f"/api/tasks/{task['id']}/timeline").json()
+    assert any(item["text"] == "Prioridade: Alta → Muito alta" for item in timeline)
+
+
+def test_existing_database_gets_priority_column(settings_env):
+    path = get_settings().db_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
+    conn.executescript(db.SCHEMA.replace("    priority TEXT NOT NULL DEFAULT 'media',\n", ""))  # esquema v1
+    conn.execute(
+        "INSERT INTO tasks(id, account_id, title, difficulty, created_at, status, phase, last_activity_at) "
+        "VALUES ('t1', 'a1', 'Antiga', 'medio', '2026-09-01T12:00:00Z', 'pendente', 'planejamento', '2026-09-01T12:00:00Z')"
+    )
+    conn.commit()
+    assert "priority" not in {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
+    conn.close()
+
+    db.init_db(path)
+    db.init_db(path)  # idempotente
+    conn = db.connect(path)
+    try:
+        assert conn.execute("SELECT priority FROM tasks WHERE id = 't1'").fetchone()["priority"] == "media"
+    finally:
+        conn.close()
 
 
 def test_steps_drive_status(api):

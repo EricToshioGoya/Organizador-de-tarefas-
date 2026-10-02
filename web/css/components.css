@@ -652,6 +652,22 @@ input[type="time"].input {
   --badge-color: var(--diff-dificil);
 }
 
+.badge.prio-baixa {
+  --badge-color: var(--prio-baixa);
+}
+
+.badge.prio-media {
+  --badge-color: var(--prio-media);
+}
+
+.badge.prio-alta {
+  --badge-color: var(--prio-alta);
+}
+
+.badge.prio-muito_alta {
+  --badge-color: var(--prio-muito_alta);
+}
+
 .badge.phase-planejamento {
   --badge-color: var(--phase-planejamento);
 }
@@ -672,9 +688,10 @@ input[type="time"].input {
   --badge-color: var(--phase-concluido);
 }
 
-/* Dificuldade e fase levam um leve tom da própria cor, com texto escuro */
+/* Dificuldade, fase e prioridade levam um leve tom da própria cor, com texto escuro */
 .badge[class*="diff-"],
-.badge[class*="phase-"] {
+.badge[class*="phase-"],
+.badge[class*="prio-"] {
   color: var(--text-1);
   background: color-mix(in srgb, var(--badge-color) 16%, #ffffff);
   border-color: color-mix(in srgb, var(--badge-color) 28%, #ffffff);
@@ -1030,6 +1047,73 @@ input[type="time"].input {
   width: 14px;
   height: 14px;
   color: var(--text-3);
+}
+
+.task-meta .badge-btn svg.prio-flag {
+  color: var(--badge-color);
+}
+
+/* Descrição no cartão: prévia de 2 linhas, "Ver mais" e edição no próprio cartão */
+.task-desc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  margin-top: -4px;
+}
+
+.task-desc-text {
+  width: 100%;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.task-desc-text.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.task-desc-text.editable {
+  cursor: text;
+  margin: -2px -6px;
+  padding: 2px 6px;
+  width: calc(100% + 12px);
+  border-radius: var(--radius-sm);
+}
+
+.task-desc-text.editable:hover {
+  background: var(--surface-hover);
+}
+
+.task-desc-text.editable:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.task-desc-toggle {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.task-desc-toggle:hover {
+  color: var(--text-1);
+  text-decoration: underline;
+}
+
+.task-desc-editor .textarea {
+  font-size: var(--text-sm);
 }
 
 .next-step {

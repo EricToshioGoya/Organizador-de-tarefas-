@@ -22,6 +22,12 @@ DEFAULT_DIFFICULTY = "medio"
 DIFFICULTY_LABELS = {"facil": "Fácil", "medio": "Médio", "dificil": "Difícil"}
 DIFFICULTY_POINTS = {"facil": 1, "medio": 2, "dificil": 3}
 
+# Prioridade: define a ordem das pendentes (da mais alta para a mais baixa)
+PRIORITIES = ("baixa", "media", "alta", "muito_alta")
+DEFAULT_PRIORITY = "media"
+PRIORITY_LABELS = {"baixa": "Baixa", "media": "Média", "alta": "Alta", "muito_alta": "Muito alta"}
+PRIORITY_RANK = {"muito_alta": 0, "alta": 1, "media": 2, "baixa": 3}
+
 # Fases (RF57, RN31)
 PHASES = ("planejamento", "producao", "alpha", "beta", "concluido")
 DEFAULT_PHASE = "planejamento"

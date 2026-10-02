@@ -9,6 +9,18 @@ export const DIFFICULTIES = [
 ];
 export const DIFFICULTY_LABEL = Object.fromEntries(DIFFICULTIES.map((d) => [d.key, d.label]));
 
+export const PRIORITIES = [
+  { key: "baixa", label: "Baixa" },
+  { key: "media", label: "Média" },
+  { key: "alta", label: "Alta" },
+  { key: "muito_alta", label: "Muito alta" },
+];
+export const PRIORITY_LABEL = Object.fromEntries(PRIORITIES.map((p) => [p.key, p.label]));
+export const DEFAULT_PRIORITY = "media";
+const PRIORITY_RANK = { muito_alta: 0, alta: 1, media: 2, baixa: 3 };
+/** Tarefas guardadas no aparelho antes da prioridade existir contam como Média. */
+export const priorityOf = (task) => (task.priority in PRIORITY_RANK ? task.priority : DEFAULT_PRIORITY);
+
 export const PHASES = [
   { key: "planejamento", label: "Planejamento", short: "Planejamento" },
   { key: "producao", label: "Em produção", short: "Em produção" },
@@ -27,6 +39,7 @@ export const PHASE_COLOR = {
   concluido: "#16a34a",
 };
 export const DIFFICULTY_COLOR = { facil: "#16a34a", medio: "#eab308", dificil: "#dc2626" };
+export const PRIORITY_COLOR = { baixa: "#94a3b8", media: "#2a78d6", alta: "#f97316", muito_alta: "#dc2626" };
 
 export const POSTPONE_REASONS = [
   { key: "subestimei", label: "Subestimei o esforço" },
@@ -98,12 +111,12 @@ export function staleDaysOf(task, now = Date.now()) {
   return Math.floor((now - new Date(task.last_activity_at).getTime()) / 86_400_000);
 }
 
-/** RF14: pendentes por entrega (mais próxima primeiro); concluídas pela conclusão (mais recente primeiro). */
+/** Pendentes por prioridade (Muito alta primeiro; no empate, a criada antes); concluídas pela conclusão (mais recente primeiro). */
 export function sortPending(tasks) {
   return [...tasks].sort((a, b) => {
-    if (!a.due_date !== !b.due_date) return a.due_date ? -1 : 1;
-    if (a.due_date !== b.due_date) return a.due_date < b.due_date ? -1 : 1;
-    return a.created_at < b.created_at ? -1 : 1;
+    const rank = PRIORITY_RANK[priorityOf(a)] - PRIORITY_RANK[priorityOf(b)];
+    if (rank) return rank;
+    return a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0;
   });
 }
 

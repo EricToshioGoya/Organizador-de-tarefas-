@@ -5,7 +5,7 @@ import { html, cx } from "../lib/html.js";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Icon } from "../ui/icons.js";
 import { Drawer, Menu, Modal } from "../ui/overlay.js";
-import { Avatar, Badge, Button, Checkbox, DifficultyBadge, IconButton, PhaseBadge, Progress, Segmented, StatusBadge } from "../ui/core.js";
+import { Avatar, Badge, Button, Checkbox, DifficultyBadge, IconButton, PhaseBadge, PriorityBadge, Progress, Segmented, StatusBadge } from "../ui/core.js";
 import { AutoText, Autocomplete, DateInput, Field, Select, useFieldId } from "../ui/forms.js";
 import { StepsEditor } from "./StepsEditor.js";
 import { copyableFrom } from "./TaskForm.js";
@@ -17,6 +17,7 @@ import {
   DIFFICULTY_LABEL,
   PHASES,
   POSTPONE_REASONS,
+  PRIORITIES,
   TITLE_MAX,
   classifyDueChange,
   isDone,
@@ -24,6 +25,7 @@ import {
   isStale,
   orderedSteps,
   overdueDays,
+  priorityOf,
 } from "../lib/rules.js";
 import { dueLabel, fmtDate, fmtDateTime, fmtNumber, fmtSize, hostOf, plural, relativeTime, todayISO } from "../lib/format.js";
 import {
@@ -279,6 +281,7 @@ function TaskDetail({ task, board, readOnly, owner }) {
             onSave=${(value) => updateTask(accountId, task.id, { title: value.trim() })}
           />`}
       <div class="row-wrap">
+        <${PriorityBadge} value=${priorityOf(task)} />
         <${DifficultyBadge} value=${task.difficulty} />
         <${PhaseBadge} value=${task.phase} />
         ${overdue ? html`<${StatusBadge} kind="critical" icon="alert">Atrasada há ${plural(overdueDays(task, today), "dia", "dias")}<//>` : null}
@@ -296,6 +299,15 @@ function TaskDetail({ task, board, readOnly, owner }) {
             value=${task.difficulty}
             options=${DIFFICULTIES.map((d) => ({ value: d.key, label: d.label, dot: `var(--diff-${d.key})` }))}
             onChange=${(value) => updateTask(accountId, task.id, { difficulty: value })}
+          />
+        <//>
+        <${Field} label="Prioridade" class="span-2">
+          <${Segmented}
+            label="Prioridade"
+            disabled=${readOnly}
+            value=${priorityOf(task)}
+            options=${PRIORITIES.map((p) => ({ value: p.key, label: p.label, dot: `var(--prio-${p.key})` }))}
+            onChange=${(value) => updateTask(accountId, task.id, { priority: value })}
           />
         <//>
         <${Field} label="Data de entrega" id=${ids.due} hint=${task.due_date ? dueLabel(task.due_date, today) : "Sem data: não entra nos cálculos de atraso."}>
