@@ -15,6 +15,9 @@ import {
   orderedSteps,
   overdueDays,
   priorityOf,
+  DIFFICULTIES,
+  DIFFICULTY_COLOR,
+  DIFFICULTY_LABEL,
   staleDaysOf,
   PHASES,
   PHASE_COLOR,
@@ -23,7 +26,8 @@ import {
   PRIORITY_COLOR,
   PRIORITY_LABEL,
 } from "../lib/rules.js";
-import { setTaskDone, toggleStep, confirmDialog, updateTask, deleteTask, addSteps, deleteStep } from "../actions.js";
+import { setTaskDone, toggleStep, confirmDialog, updateTask, deleteTask, addSteps, deleteStep, reorderSteps } from "../actions.js";
+import { useReorder } from "../lib/reorder.js";
 import { setState } from "../lib/store.js";
 
 export function openTask(task) {
@@ -78,6 +82,31 @@ function PriorityPicker({ task, readOnly }) {
       dot: PRIORITY_COLOR[p.key],
       checked: p.key === current,
       onClick: () => p.key !== current && updateTask(task.account_id, task.id, { priority: p.key }),
+    }))}
+  />`;
+}
+
+function DifficultyPicker({ task, readOnly }) {
+  if (readOnly) return html`<${DifficultyBadge} value=${task.difficulty} />`;
+  return html`<${Menu}
+    align="left"
+    header=${html`<div class="menu-header xsmall faint">Mudar dificuldade</div>`}
+    trigger=${(props) => html`<button
+      type="button"
+      class=${cx("badge", "badge-btn", `diff-${task.difficulty}`)}
+      title="Alterar dificuldade"
+      aria-label=${`Dificuldade: ${DIFFICULTY_LABEL[task.difficulty]}. Alterar dificuldade`}
+      aria-haspopup=${props["aria-haspopup"]}
+      aria-expanded=${props["aria-expanded"]}
+      onClick=${props.toggle}
+    >
+      <span class="dot" aria-hidden="true"></span>${DIFFICULTY_LABEL[task.difficulty]}<${Icon} name="chevronDown" />
+    </button>`}
+    items=${DIFFICULTIES.map((d) => ({
+      label: d.label,
+      dot: DIFFICULTY_COLOR[d.key],
+      checked: d.key === task.difficulty,
+      onClick: () => d.key !== task.difficulty && updateTask(task.account_id, task.id, { difficulty: d.key }),
     }))}
   />`;
 }
@@ -168,6 +197,12 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
   const isNew = !!task.assigned_by && !task.assigned_seen_at && !readOnly;
   const unread = task.comments?.unread || 0;
   const hasDesc = !!task.description?.trim();
+  const sortedSteps = orderedSteps(task.steps);
+  const { listProps, handleProps, rowState } = useReorder(
+    sortedSteps.map((s) => s.id),
+    (order) => reorderSteps(task.account_id, task.id, order),
+    readOnly,
+  );
 
   const toggleTask = async (checked) => {
     if (readOnly) return;
@@ -233,7 +268,7 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
 
       <div class="task-meta">
         <${PriorityPicker} task=${task} readOnly=${readOnly} />
-        <${DifficultyBadge} value=${task.difficulty} />
+        <${DifficultyPicker} task=${task} readOnly=${readOnly} />
         ${!compact ? html`<${PhasePicker} task=${task} readOnly=${readOnly} />` : null}
         ${overdue
           ? html`<${StatusBadge} kind="critical" icon="alert">Atrasada há ${plural(overdueDays(task, today), "dia", "dias")}<//>`
@@ -286,9 +321,20 @@ export function TaskCard({ task, readOnly, staleDays = 5, goals, showSteps = fal
         : null}
 
       ${expanded
-        ? html`<ul class="inline-steps" aria-label="Etapas">
-            ${orderedSteps(task.steps).map(
-              (step) => html`<li key=${step.id} class=${cx("step", step.done && "done")} style="min-height:32px">
+        ? html`<ul class="inline-steps" aria-label="Etapas" ...${listProps}>
+            ${sortedSteps.map(
+              (step) => html`<li key=${step.id} data-step=${step.id} class=${cx("step", step.done && "done", rowState(step.id))} style="min-height:32px">
+                ${!readOnly && sortedSteps.length > 1
+                  ? html`<button
+                      type="button"
+                      class="drag-handle"
+                      aria-label=${`Reordenar: ${step.text}. Use as setas para cima e para baixo.`}
+                      title="Arraste para reordenar (ou use as setas)"
+                      ...${handleProps(step.id)}
+                    >
+                      <${Icon} name="grip" size=${16} />
+                    </button>`
+                  : null}
                 <${Checkbox}
                   size="sm"
                   checked=${step.done}

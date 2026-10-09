@@ -1,12 +1,13 @@
 // Editor de etapas (RF07–RF11): marcar com um clique, editar, remover, reordenar (arrastar ou teclado),
 // colar várias de uma vez (RF44) e gerar por IA com revisão antes de gravar (RF52, RN26).
 import { html, cx } from "../lib/html.js";
-import { useRef, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { Icon } from "../ui/icons.js";
 import { Checkbox, IconButton, Button } from "../ui/core.js";
 import { Modal } from "../ui/overlay.js";
 import { api } from "../lib/api.js";
 import { splitPastedSteps } from "../lib/rules.js";
+import { useReorder } from "../lib/reorder.js";
 import { getState } from "../lib/store.js";
 import { toast } from "../actions.js";
 
@@ -114,8 +115,11 @@ export function StepsEditor({ steps, readOnly, showCheck = true, onAdd, onToggle
   const [paste, setPaste] = useState(null);
   const [aiSteps, setAiSteps] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [drag, setDrag] = useState(null); // { id, over, position }
-  const listRef = useRef(null);
+  const { listProps, handleProps, rowState } = useReorder(
+    steps.map((s) => s.id),
+    onReorder,
+    readOnly,
+  );
   const aiEnabled = getState().meta?.ai_enabled;
 
   const add = () => {
@@ -123,49 +127,6 @@ export function StepsEditor({ steps, readOnly, showCheck = true, onAdd, onToggle
     if (!text) return;
     onAdd([text], "form");
     setDraft("");
-  };
-
-  const move = (id, delta) => {
-    const ids = steps.map((s) => s.id);
-    const index = ids.indexOf(id);
-    const target = index + delta;
-    if (target < 0 || target >= ids.length) return;
-    ids.splice(index, 1);
-    ids.splice(target, 0, id);
-    onReorder(ids);
-    requestAnimationFrame(() => listRef.current?.querySelector(`[data-step="${id}"] .drag-handle`)?.focus());
-  };
-
-  const onPointerDown = (event, id) => {
-    if (readOnly || event.button !== 0) return;
-    event.preventDefault();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ id, over: id, position: "before" });
-  };
-
-  const onPointerMove = (event) => {
-    if (!drag || !listRef.current) return;
-    const rows = [...listRef.current.querySelectorAll("[data-step]")];
-    for (const row of rows) {
-      const rect = row.getBoundingClientRect();
-      if (event.clientY >= rect.top && event.clientY <= rect.bottom) {
-        const position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
-        if (row.dataset.step !== drag.over || position !== drag.position) setDrag({ ...drag, over: row.dataset.step, position });
-        break;
-      }
-    }
-  };
-
-  const onPointerUp = () => {
-    if (!drag) return;
-    const ids = steps.map((s) => s.id).filter((id) => id !== drag.id);
-    if (drag.over !== drag.id) {
-      let index = ids.indexOf(drag.over);
-      if (drag.position === "after") index += 1;
-      ids.splice(index, 0, drag.id);
-      onReorder(ids);
-    }
-    setDrag(null);
   };
 
   const generate = async () => {
@@ -187,17 +148,12 @@ export function StepsEditor({ steps, readOnly, showCheck = true, onAdd, onToggle
 
   return html`<div class="stack" style="gap:8px">
     ${steps.length
-      ? html`<ul class="steps" ref=${listRef} onPointerMove=${onPointerMove} onPointerUp=${onPointerUp} onPointerCancel=${() => setDrag(null)}>
+      ? html`<ul class="steps" ...${listProps}>
           ${steps.map(
             (step) => html`<li
               key=${step.id}
               data-step=${step.id}
-              class=${cx("step", {
-                done: showCheck && step.done,
-                dragging: drag?.id === step.id,
-                "drop-before": drag && drag.over === step.id && drag.id !== step.id && drag.position === "before",
-                "drop-after": drag && drag.over === step.id && drag.id !== step.id && drag.position === "after",
-              })}
+              class=${cx("step", { done: showCheck && step.done }, rowState(step.id))}
             >
               ${!readOnly && steps.length > 1
                 ? html`<button
@@ -205,16 +161,7 @@ export function StepsEditor({ steps, readOnly, showCheck = true, onAdd, onToggle
                     class="drag-handle"
                     aria-label=${`Reordenar: ${step.text}. Use as setas para cima e para baixo.`}
                     title="Arraste para reordenar (ou use as setas)"
-                    onPointerDown=${(e) => onPointerDown(e, step.id)}
-                    onKeyDown=${(e) => {
-                      if (e.key === "ArrowUp") {
-                        e.preventDefault();
-                        move(step.id, -1);
-                      } else if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        move(step.id, 1);
-                      }
-                    }}
+                    ...${handleProps(step.id)}
                   >
                     <${Icon} name="grip" size=${16} />
                   </button>`
