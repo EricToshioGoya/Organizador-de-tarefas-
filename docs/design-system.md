@@ -57,6 +57,20 @@ A escala de fases é pedida pelo significado (amarelo → vermelho) e por isso n
 amarelo claro de Planejamento fica abaixo de 2:1 sobre o branco. Como compensação, as barras levam rótulo
 de valor, contorno sutil e a tabela equivalente.
 
+## Calendário
+
+| Papel | Cores | Observação |
+|---|---|---|
+| Cor do evento (escolha da pessoa) | `#2a78d6` azul · `#16a34a` verde · `#eab308` amarelo · `#ea580c` laranja · `#dc2626` vermelho · `#7c3aed` roxo · `#8a8a83` cinza | tokens `--ev-*` |
+| Bloco do evento | faixa lateral de 3 px na cor, fundo com 16% dela (26% no hover) e texto com 40% dela sobre o grafite | texto ≥ 6,1:1 sobre o fundo e ≥ 5,7:1 no hover (WCAG AA) |
+| Grade | linhas `--cal-line` (hora) e `--cal-line-soft` (meia hora); hoje em `--cal-today`, fim de semana em `--cal-weekend` | linha "agora" em `--critical` |
+| Entregas e metas | entrega em branco com contorno (atrasada em vermelho, concluída riscada em verde); meta em creme | ícone + texto, nunca só cor |
+
+A cor do evento é decorativa: o título está sempre escrito, e repetição e "Particular" têm ícone próprio.
+Eventos lado a lado em colunas estreitas cortam cada linha com reticências (container query) em vez de quebrar
+palavras. Com seis abas, o cabeçalho tira os ícones das abas abaixo de 1440 px e, abaixo de 1280 px, também o
+nome da marca e os textos dos botões.
+
 Texto: `#1d1d1b`, `#4f4f49` e `#62625b` — sobre o branco 16,9 · 8,2 · 6,1:1 e sobre o fundo cinza
 13,4 · 6,6 · 4,9:1, todos WCAG AA (RNF12).
 

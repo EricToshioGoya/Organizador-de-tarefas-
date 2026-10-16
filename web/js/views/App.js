@@ -1,4 +1,4 @@
-// Estrutura do app: cabeçalho com abas, indicador de salvamento (RF69), menu da conta (RF26),
+// Estrutura do app: cabeçalho com abas (incluindo o Calendário), indicador de salvamento (RF69), menu da conta (RF26),
 // criação de tarefa em 1 clique de qualquer tela (RNF10), gaveta de detalhes e painel de drill-down.
 import { html, cx } from "../lib/html.js";
 import { useEffect } from "preact/hooks";
@@ -9,6 +9,7 @@ import { Drawer, Menu, Toasts } from "../ui/overlay.js";
 import { AccountPicker } from "./AccountPicker.js";
 import { TodayView } from "./TodayView.js";
 import { TasksView } from "./TasksView.js";
+import { CalendarView } from "./CalendarView.js";
 import { GoalsView, GoalDetailView } from "./GoalsView.js";
 import { PerformanceView } from "./PerformanceView.js";
 import { TeamView, MemberProfileView } from "./TeamView.js";
@@ -23,6 +24,7 @@ import { navigate, openModal, switchAccount } from "../actions.js";
 const MEMBER_TABS = [
   { key: "hoje", label: "Hoje", icon: "sun" },
   { key: "tarefas", label: "Tarefas", icon: "list" },
+  { key: "calendario", label: "Calendário", icon: "calendar" },
   { key: "metas", label: "Metas", icon: "target" },
   { key: "desempenho", label: "Desempenho", icon: "chart" },
   { key: "equipe", label: "Equipe", icon: "users" },
@@ -31,6 +33,7 @@ const MANAGER_TABS = [
   { key: "equipe", label: "Painel", icon: "dashboard" },
   { key: "hoje", label: "Hoje", icon: "sun" },
   { key: "tarefas", label: "Tarefas", icon: "list" },
+  { key: "calendario", label: "Calendário", icon: "calendar" },
   { key: "metas", label: "Metas", icon: "target" },
   { key: "desempenho", label: "Desempenho", icon: "chart" },
 ];
@@ -66,7 +69,7 @@ function SaveIndicator() {
     aria-label=${`${view.text}. ${view.title}`}
   >
     <${Icon} name=${view.icon} class=${status === "saving" ? "spin" : ""} />
-    <span class="hide-mobile">${view.text}</span>
+    <span class="hide-mobile hide-compact">${view.text}</span>
   </button>`;
 }
 
@@ -135,6 +138,8 @@ function Page({ route }) {
       return html`<${TodayView} />`;
     case "tarefas":
       return html`<${TasksView} />`;
+    case "calendario":
+      return html`<${CalendarView} />`;
     case "metas":
       return html`<${GoalsView} />`;
     case "meta":
@@ -144,7 +149,7 @@ function Page({ route }) {
     case "equipe":
       return html`<${TeamView} />`;
     case "membro":
-      return html`<${MemberProfileView} accountId=${route.params.accountId} tab=${route.params.tab} goalId=${route.params.meta} />`;
+      return html`<${MemberProfileView} accountId=${route.params.accountId} tab=${route.params.tab} goalId=${route.params.meta} week=${route.params.semana} />`;
     case "conta":
       return html`<${SettingsView} />`;
     default:
@@ -207,8 +212,8 @@ export function App() {
       <div class="header-spacer"></div>
       <div class="header-actions">
         <${SaveIndicator} />
-        <${Button} variant="primary" icon="plus" class="hide-mobile" onClick=${() => openModal("newTask", {})} title="Nova tarefa (atalho: N)">Nova tarefa<//>
-        ${me.role === "gestor" ? html`<${Badge} tone="violet" icon="crown" class="hide-mobile">Gestor<//>` : null}
+        <${Button} variant="primary" icon="plus" class="hide-mobile" onClick=${() => openModal("newTask", {})} title="Nova tarefa (atalho: N)" aria-label="Nova tarefa"><span class="hide-compact">Nova tarefa</span><//>
+        ${me.role === "gestor" ? html`<${Badge} tone="violet" icon="crown" class="hide-mobile hide-compact">Gestor<//>` : null}
         <${UserMenu} me=${me} />
       </div>
     </header>
@@ -221,7 +226,7 @@ export function App() {
     <nav class="bottom-nav" aria-label="Principal">
       ${tabs.map(
         (tab) => html`<a key=${tab.key} class="bottom-tab" href=${`#/${tab.key}`} aria-current=${current === tab.key ? "page" : undefined}>
-          <${Icon} name=${tab.icon} size=${20} />${tab.label}
+          <${Icon} name=${tab.icon} size=${20} /><span class="bottom-tab-label">${tab.label}</span>
           ${badgeFor(tab.key) ? html`<span class="nav-badge">${badgeFor(tab.key)}</span>` : null}
         </a>`,
       )}

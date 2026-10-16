@@ -7,7 +7,8 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from ..domain import rules
-from ..domain.models import Account, Goal, Task
+from ..domain.constants import PRIVATE_EVENT_COLOR, PRIVATE_EVENT_TITLE
+from ..domain.models import Account, CalendarEntry, Goal, Task
 from ..domain.timeutil import date_iso, local_date, to_iso
 from ..metrics import capacity
 from ..metrics.common import first_activity_day
@@ -125,6 +126,30 @@ def comment_json(comment: dict) -> dict:
     }
 
 
+def calendar_entry_json(entry: CalendarEntry, viewer: Account | None) -> dict:
+    """Evento particular visto por outra conta mostra só o horário (não é controle de acesso — RN11)."""
+    hidden = entry.private and not rules.can_edit(viewer, entry.account_id)
+    return {
+        "id": entry.id,
+        "account_id": entry.account_id,
+        "title": PRIVATE_EVENT_TITLE if hidden else entry.title,
+        "notes": "" if hidden else entry.notes,
+        "location": "" if hidden else entry.location,
+        "all_day": entry.all_day,
+        "start_date": date_iso(entry.start_date),
+        "start_time": entry.start_time,
+        "end_date": date_iso(entry.end_date),
+        "end_time": entry.end_time,
+        "color": PRIVATE_EVENT_COLOR if hidden else entry.color,
+        "private": entry.private,
+        "redacted": hidden,
+        "recurrence": entry.recurrence,
+        "exceptions": entry.exceptions,
+        "created_at": to_iso(entry.created_at),
+        "updated_at": to_iso(entry.updated_at),
+    }
+
+
 def task_payload(conn: sqlite3.Connection, task: Task, viewer: Account | None) -> dict:
     attachments = repo.attachments_by_task(conn, [task.id]).get(task.id, [])
     comments = None
@@ -162,4 +187,5 @@ def board_json(conn: sqlite3.Connection, account: Account, viewer: Account | Non
         },
         "requesters": repo.list_requesters(conn, account.id) if own else [],
         "overload": capacity.overload(tasks, today, tz, first_activity_day(tasks, tz)),
+        "calendar": [calendar_entry_json(e, viewer) for e in repo.list_calendar_entries(conn, account.id)],
     }

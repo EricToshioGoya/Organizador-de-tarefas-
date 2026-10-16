@@ -19,6 +19,8 @@ HANDLERS: dict[str, Handler] = {}
 TASK_TEXT_FIELDS = {"title", "description", "difficulty", "priority", "requester", "notes", "links"}
 GOAL_FIELDS = {"title", "description", "target_date"}
 TEMPLATE_FIELDS = {"name", "title", "description", "difficulty", "steps"}
+CALENDAR_SCHEDULE_FIELDS = {"all_day", "start_date", "start_time", "end_date", "end_time"}
+CALENDAR_FIELDS = {"title", "notes", "location", "color", "private", "recurrence", *CALENDAR_SCHEDULE_FIELDS}
 
 
 def handles(*types: str) -> Callable[[Handler], Handler]:
@@ -127,11 +129,11 @@ def _settings_changed(conn, ev, p):
 
 @handles("ContaExcluida")
 def _account_deleted(conn, ev, p):
-    """RN13: a exclusão da conta leva junto tarefas, metas e templates."""
+    """RN13: a exclusão da conta leva junto tarefas, metas, templates e o calendário."""
     account_id = ev["aggregate_id"]
     task_ids = [r["id"] for r in conn.execute("SELECT id FROM tasks WHERE account_id = ?", (account_id,))]
     _delete_task_rows(conn, task_ids)
-    for table in ("goals", "templates", "top3", "weekly_reviews", "comment_reads"):
+    for table in ("goals", "templates", "top3", "weekly_reviews", "comment_reads", "calendar_entries"):
         conn.execute(f"DELETE FROM {table} WHERE account_id = ?", (account_id,))
     conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
 
@@ -498,3 +500,79 @@ def _review_seen(conn, ev, p):
         "UPDATE weekly_reviews SET seen_at = COALESCE(seen_at, ?) WHERE account_id = ? AND week_start = ?",
         (ev["occurred_at"], ev["account_id"], p["week_start"]),
     )
+
+
+# ---------------------------------------------------------------------------
+# Calendário
+# ---------------------------------------------------------------------------
+
+
+def _calendar_value(field: str, value):
+    if field == "recurrence":
+        return dumps(value) if value else None
+    if field in ("all_day", "private"):
+        return 1 if value else 0
+    return value
+
+
+@handles("EventoAgendaCriado")
+def _calendar_created(conn, ev, p):
+    ts = ev["occurred_at"]
+    stamps = {name: ts for name in ("title", "notes", "location", "color", "private", "schedule", "recurrence")}
+    conn.execute(
+        "INSERT INTO calendar_entries(id, account_id, title, notes, location, all_day, start_date, start_time, end_date, "
+        "end_time, color, private, recurrence, exceptions, created_at, updated_at, field_ts, version) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?, ?)",
+        (
+            ev["aggregate_id"],
+            ev["account_id"],
+            p["title"],
+            p.get("notes", ""),
+            p.get("location", ""),
+            _calendar_value("all_day", p.get("all_day")),
+            p["start_date"],
+            p.get("start_time"),
+            p["end_date"],
+            p.get("end_time"),
+            p.get("color", "azul"),
+            _calendar_value("private", p.get("private")),
+            _calendar_value("recurrence", p.get("recurrence")),
+            ts,
+            ts,
+            dumps(stamps),
+            ev["seq"],
+        ),
+    )
+
+
+@handles("EventoAgendaEditado")
+def _calendar_edited(conn, ev, p):
+    changes = {k: v for k, v in (p.get("changes") or {}).items() if k in CALENDAR_FIELDS}
+    for field, change in changes.items():
+        conn.execute(
+            f"UPDATE calendar_entries SET {field} = ? WHERE id = ?",
+            (_calendar_value(field, change.get("new")), ev["aggregate_id"]),
+        )
+    conn.execute(
+        "UPDATE calendar_entries SET updated_at = MAX(updated_at, ?), version = ? WHERE id = ?",
+        (ev["occurred_at"], ev["seq"], ev["aggregate_id"]),
+    )
+    stamps = {"schedule" if name in CALENDAR_SCHEDULE_FIELDS else name for name in changes}
+    _merge_field_ts(conn, "calendar_entries", ev["aggregate_id"], stamps, ev["occurred_at"])
+
+
+@handles("OcorrenciaAgendaExcluida")
+def _calendar_occurrence_removed(conn, ev, p):
+    row = conn.execute("SELECT exceptions FROM calendar_entries WHERE id = ?", (ev["aggregate_id"],)).fetchone()
+    if row is None:
+        return
+    exceptions = sorted(set(json.loads(row["exceptions"] or "[]")) | {p["date"]})
+    conn.execute(
+        "UPDATE calendar_entries SET exceptions = ?, updated_at = MAX(updated_at, ?), version = ? WHERE id = ?",
+        (dumps(exceptions), ev["occurred_at"], ev["seq"], ev["aggregate_id"]),
+    )
+
+
+@handles("EventoAgendaExcluido")
+def _calendar_deleted(conn, ev, p):
+    conn.execute("DELETE FROM calendar_entries WHERE id = ?", (ev["aggregate_id"],))

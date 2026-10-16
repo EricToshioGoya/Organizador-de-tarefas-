@@ -10,7 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 from typing import Iterable
 
-from ..domain import rules
+from ..domain import calendar, rules
 from ..domain.constants import (
     DEFAULT_DIFFICULTY,
     DEFAULT_PHASE,
@@ -20,7 +20,7 @@ from ..domain.constants import (
     TEXT_MAX,
     TITLE_MAX,
 )
-from ..domain.models import Account, Goal, Task
+from ..domain.models import Account, CalendarEntry, Goal, Task
 from ..domain.rules import DomainError, not_found, read_only
 from ..domain.timeutil import date_iso, local_date, parse_date, today_in, utcnow, week_start
 from ..metrics import weekly
@@ -772,6 +772,111 @@ def mark_comments_read(ctx: Ctx, task_id: str) -> None:
             task_id=task_id,
             payload={"read_at": max(newest, ctx.ts)},
         )
+
+
+# ---------------------------------------------------------------------------
+# Calendário: eventos com horário ou de dia inteiro, repetição e ocorrências
+# ---------------------------------------------------------------------------
+
+
+def _entry_for_edit(ctx: Ctx, entry_id: str) -> CalendarEntry:
+    entry = repo.get_calendar_entry(ctx.conn, entry_id)
+    if entry is None:
+        raise not_found("Evento")
+    _own(ctx, entry.account_id)
+    return entry
+
+
+def _occurrence_day(entry: CalendarEntry, day: object) -> object:
+    occurrence = _date(day, "Data da ocorrência")
+    if not entry.is_recurring or not calendar.occurs_on(entry, occurrence):  # type: ignore[arg-type]
+        raise DomainError("Esta data não é uma ocorrência do evento.", code="ocorrencia_invalida")
+    return occurrence
+
+
+def create_calendar_entry(ctx: Ctx, account_id: str, data: dict) -> CalendarEntry:
+    """Só a própria conta anota no seu calendário; as outras contas o veem em modo somente leitura."""
+    _own(ctx, account_id)
+    entry_id = clean_id(data.get("id")) or new_id()
+    existing = repo.get_calendar_entry(ctx.conn, entry_id)
+    if existing is not None:
+        if existing.account_id == account_id:
+            return existing  # reenvio da fila offline (RF71)
+        raise DomainError("Identificador de evento já utilizado.", code="conflito", status=409)
+    ctx.emit("EventoAgendaCriado", "calendar", entry_id, account_id=account_id, payload=calendar.clean_entry(data))
+    return repo.get_calendar_entry(ctx.conn, entry_id)  # type: ignore[return-value]
+
+
+def update_calendar_entry(ctx: Ctx, entry_id: str, changes: dict) -> CalendarEntry:
+    """Edição parcial; em conflito, vale a alteração mais recente de cada campo (RN30)."""
+    entry = _entry_for_edit(ctx, entry_id)
+    stamps = repo.calendar_field_ts(ctx.conn, entry_id)
+    current = calendar.entry_fields(entry)
+    merged = dict(current)
+    for field in ("title", "notes", "location", "color", "private", "recurrence"):
+        if field in changes and _newer(ctx, stamps, field):
+            merged[field] = changes[field]
+    schedule = {field: changes[field] for field in calendar.SCHEDULE_FIELDS if field in changes}
+    if schedule and _newer(ctx, stamps, "schedule"):
+        merged.update(calendar.merge_schedule(current, schedule))
+    cleaned = calendar.clean_entry(merged)
+    diff = {field: {"old": current[field], "new": value} for field, value in cleaned.items() if current[field] != value}
+    if diff:
+        ctx.emit("EventoAgendaEditado", "calendar", entry_id, account_id=entry.account_id, payload={"changes": diff})
+    return repo.get_calendar_entry(ctx.conn, entry_id)  # type: ignore[return-value]
+
+
+def delete_calendar_entry(ctx: Ctx, entry_id: str) -> None:
+    """Exclui o evento (a série inteira, se repetir)."""
+    entry = repo.get_calendar_entry(ctx.conn, entry_id)
+    if entry is None:
+        return  # já excluído (reenvio)
+    _own(ctx, entry.account_id)
+    ctx.emit("EventoAgendaExcluido", "calendar", entry_id, account_id=entry.account_id, payload={"title": entry.title})
+
+
+def exclude_occurrence(ctx: Ctx, entry_id: str, day: object) -> CalendarEntry:
+    """Exclui uma única ocorrência de um evento que se repete; a série continua."""
+    entry = _entry_for_edit(ctx, entry_id)
+    if str(day)[:10] in entry.exceptions:
+        return entry  # já excluída (reenvio)
+    occurrence = _occurrence_day(entry, day)
+    ctx.emit(
+        "OcorrenciaAgendaExcluida",
+        "calendar",
+        entry_id,
+        account_id=entry.account_id,
+        payload={"date": date_iso(occurrence), "title": entry.title},  # type: ignore[arg-type]
+    )
+    return repo.get_calendar_entry(ctx.conn, entry_id)  # type: ignore[return-value]
+
+
+def detach_occurrence(ctx: Ctx, entry_id: str, day: object, changes: dict) -> tuple[CalendarEntry, CalendarEntry]:
+    """Altera só uma ocorrência: ela sai da série e vira um evento avulso com as alterações (como no Outlook)."""
+    entry = _entry_for_edit(ctx, entry_id)
+    new_entry_id = clean_id(changes.get("id")) or new_id()
+    existing = repo.get_calendar_entry(ctx.conn, new_entry_id)
+    if existing is not None:
+        if existing.account_id == entry.account_id:
+            return entry, existing  # reenvio da fila offline (RF71)
+        raise DomainError("Identificador de evento já utilizado.", code="conflito", status=409)
+    occurrence = _occurrence_day(entry, day)
+    data = calendar.occurrence_fields(entry, occurrence)  # type: ignore[arg-type]
+    data.update({k: v for k, v in changes.items() if k in calendar.ENTRY_FIELDS and k not in calendar.SCHEDULE_FIELDS and k != "recurrence"})
+    data.update(calendar.merge_schedule(data, {k: v for k, v in changes.items() if k in calendar.SCHEDULE_FIELDS}))
+    payload = calendar.clean_entry(data)
+    ctx.emit(
+        "OcorrenciaAgendaExcluida",
+        "calendar",
+        entry_id,
+        account_id=entry.account_id,
+        payload={"date": date_iso(occurrence), "title": entry.title, "detached_to": new_entry_id},  # type: ignore[arg-type]
+    )
+    payload.update(series_id=entry_id, occurrence_date=date_iso(occurrence))  # type: ignore[arg-type]
+    ctx.emit("EventoAgendaCriado", "calendar", new_entry_id, account_id=entry.account_id, payload=payload)
+    series = repo.get_calendar_entry(ctx.conn, entry_id)
+    created = repo.get_calendar_entry(ctx.conn, new_entry_id)
+    return series, created  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------

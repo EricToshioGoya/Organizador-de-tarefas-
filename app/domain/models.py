@@ -1,4 +1,4 @@
-"""Modelos do domínio (seção 2.2 — tarefa; 2.8 — meta; 2.7 — conta)."""
+"""Modelos do domínio (seção 2.2 — tarefa; 2.8 — meta; 2.7 — conta; evento do calendário)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 
 from .constants import (
+    DEFAULT_CALENDAR_COLOR,
     DEFAULT_DIFFICULTY,
     DEFAULT_PHASE,
     DEFAULT_PRIORITY,
@@ -89,3 +90,34 @@ class Account:
     @property
     def is_manager(self) -> bool:
         return self.role == ROLE_MANAGER
+
+
+@dataclass
+class CalendarEntry:
+    """Evento do calendário. Datas e horários são locais e "flutuantes" (sem fuso), como numa agenda.
+
+    Dia inteiro: `start_date` a `end_date`, inclusive, sem horários. Com horário: de `start_date start_time`
+    até `end_date end_time` (o término pode cair em outro dia). `recurrence` repete o evento a partir do
+    início; `exceptions` são as datas de ocorrências excluídas da série.
+    """
+
+    id: str
+    account_id: str
+    title: str
+    start_date: date
+    end_date: date
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    notes: str = ""
+    location: str = ""
+    all_day: bool = False
+    start_time: str | None = None
+    end_time: str | None = None
+    color: str = DEFAULT_CALENDAR_COLOR
+    private: bool = False
+    recurrence: dict | None = None
+    exceptions: list[str] = field(default_factory=list)
+
+    @property
+    def is_recurring(self) -> bool:
+        return bool(self.recurrence)

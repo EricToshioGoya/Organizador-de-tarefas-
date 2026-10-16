@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .api import routes_accounts, routes_metrics, routes_tasks, routes_tools
+from .api import routes_accounts, routes_calendar, routes_metrics, routes_tasks, routes_tools
 from .config import WEB_DIR, get_settings
 from .domain.rules import DomainError
 from .integrations.scheduler import run_scheduler
@@ -38,6 +38,19 @@ FIELD_LABELS = {
     "text": "texto",
     "task_ids": "tarefas",
     "period": "período",
+    "notes": "anotações",
+    "location": "local",
+    "start_date": "data de início",
+    "start_time": "horário de início",
+    "end_date": "data de término",
+    "end_time": "horário de término",
+    "color": "cor",
+    "recurrence": "repetição",
+    "freq": "frequência da repetição",
+    "interval": "intervalo da repetição",
+    "weekdays": "dias da semana",
+    "until": "fim da repetição",
+    "day": "data da ocorrência",
 }
 
 
@@ -146,7 +159,7 @@ def create_app() -> FastAPI:
         errors = exc.errors()
         fields = []
         for error in errors:
-            location = [str(p) for p in error.get("loc", []) if p not in ("body", "query", "path")]
+            location = [str(p) for p in error.get("loc", []) if p not in ("body", "query", "path") and not isinstance(p, int)]
             if location:
                 fields.append(FIELD_LABELS.get(location[-1], location[-1]))
         message = "Dados inválidos" + (f": verifique {', '.join(dict.fromkeys(fields))}." if fields else ".")
@@ -154,6 +167,7 @@ def create_app() -> FastAPI:
 
     app.include_router(routes_accounts.router)
     app.include_router(routes_tasks.router)
+    app.include_router(routes_calendar.router)
     app.include_router(routes_metrics.router)
     app.include_router(routes_tools.router)
 

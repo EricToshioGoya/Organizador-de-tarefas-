@@ -22,10 +22,14 @@ def test_demo_seed_builds_consistent_history(settings_env):
         assert len(tasks) == 13  # 12 geradas + 1 atribuída pelo Gestor
         assert any(t.assigned_by for t in tasks)
         snapshot = [(t.id, t.status, t.due_date, len(t.steps)) for t in sorted(tasks, key=lambda t: t.id)]
+        agenda = repo.list_calendar_entries(conn, member.id)
+        assert any(e.recurrence and e.exceptions for e in agenda) and any(e.private for e in agenda)
+        assert all(repo.list_calendar_entries(conn, a.id) for a in accounts)
         with db.write_transaction(conn):
             projector.rebuild_projections(conn)
         rebuilt = repo.list_tasks(conn, member.id)
         assert [(t.id, t.status, t.due_date, len(t.steps)) for t in sorted(rebuilt, key=lambda t: t.id)] == snapshot
+        assert repo.list_calendar_entries(conn, member.id) == agenda
     finally:
         conn.close()
 

@@ -4,8 +4,9 @@ import { cacheGet, cacheSet, prefs } from "./lib/cache.js";
 import { uid } from "./lib/ids.js";
 import { enqueue, onDrain, onMutationError, onSyncChange, pendingFor, hasPending, startQueue } from "./lib/queue.js";
 import { normalizeTask, recomputeGoals, isDone, orderedSteps } from "./lib/rules.js";
+import { normalizeEntry } from "./lib/calendar.js";
 import { getState, setState } from "./lib/store.js";
-import { todayISO } from "./lib/format.js";
+import { addDays, diffDays, todayISO } from "./lib/format.js";
 
 const POLL_MS = 10_000; // RNF19: alterações de outras contas visíveis em até 30 s
 let lastSeq = 0;
@@ -63,6 +64,7 @@ export function parseHash(hash = location.hash) {
   switch (name) {
     case "hoje":
     case "tarefas":
+    case "calendario":
     case "metas":
     case "desempenho":
     case "equipe":
@@ -298,13 +300,14 @@ function me() {
   return getState().meId;
 }
 
-function mutate({ method, path, body, accountId, taskId, apply, onResult, success }) {
+function mutate({ method, path, body, accountId, taskId, entryId, apply, onResult, success }) {
   apply?.(); // a interface responde na hora (RNF09: ≤ 100 ms); o servidor confirma em seguida
-  const promise = enqueue({ method, path, body, account: me(), meta: { accountId, taskId } });
+  const promise = enqueue({ method, path, body, account: me(), meta: { accountId, taskId, entryId } });
+  const sameItem = (meta) => (taskId ? meta.taskId === taskId : entryId ? meta.entryId === entryId : meta.accountId === accountId);
   return promise.then(
     (result) => {
       // Aplica a resposta do servidor só se não houver outra alteração pendente no mesmo item.
-      if (onResult && !pendingFor((meta) => (taskId ? meta.taskId === taskId : meta.accountId === accountId))) onResult(result);
+      if (onResult && !pendingFor(sameItem)) onResult(result);
       if (success) toast(success);
       return result;
     },
@@ -659,6 +662,125 @@ export function linkTasks(accountId, goalId, taskIds) {
       ),
     onResult: () => scheduleRefresh(accountId, 50),
     success: taskIds.length > 1 ? `${taskIds.length} tarefas vinculadas.` : "Tarefa vinculada.",
+  });
+}
+
+// Calendário: eventos com horário ou de dia inteiro, repetição e ocorrências avulsas
+
+function updateCalendar(accountId, fn) {
+  updateBoard(accountId, (board) => ({ ...board, calendar: fn(board.calendar || []) }));
+}
+
+function replaceEntry(entry) {
+  updateCalendar(entry.account_id, (list) =>
+    list.some((e) => e.id === entry.id) ? list.map((e) => (e.id === entry.id ? entry : e)) : [...list, entry],
+  );
+}
+
+function localEntry(accountId, entryId) {
+  return (getState().boards[accountId]?.calendar || []).find((e) => e.id === entryId) || null;
+}
+
+export function createEntry(accountId, data) {
+  const id = uid();
+  const now = new Date().toISOString();
+  const optimistic = normalizeEntry({
+    id,
+    account_id: accountId,
+    notes: "",
+    location: "",
+    color: "azul",
+    private: false,
+    redacted: false,
+    recurrence: null,
+    ...data,
+    exceptions: [],
+    created_at: now,
+    updated_at: now,
+  });
+  return mutate({
+    method: "POST",
+    path: `/api/accounts/${accountId}/calendar`,
+    body: { id, ...data },
+    accountId,
+    entryId: id,
+    apply: () => updateCalendar(accountId, (list) => [...list, optimistic]),
+    onResult: replaceEntry,
+    success: "Evento criado.",
+  }).then(() => id);
+}
+
+/** Edita o evento (a série inteira, se repetir). */
+export function updateEntry(accountId, entryId, changes, { success } = {}) {
+  return mutate({
+    method: "PATCH",
+    path: `/api/calendar/${entryId}`,
+    body: changes,
+    accountId,
+    entryId,
+    apply: () => updateCalendar(accountId, (list) => list.map((e) => (e.id === entryId ? normalizeEntry({ ...e, ...changes, updated_at: new Date().toISOString() }) : e))),
+    onResult: replaceEntry,
+    success,
+  });
+}
+
+export function deleteEntry(accountId, entryId, { success = "Evento excluído." } = {}) {
+  return mutate({
+    method: "DELETE",
+    path: `/api/calendar/${entryId}`,
+    accountId,
+    entryId,
+    apply: () => updateCalendar(accountId, (list) => list.filter((e) => e.id !== entryId)),
+    success,
+  });
+}
+
+/** Exclui só uma ocorrência; a série continua. */
+export function excludeOccurrence(accountId, entryId, day) {
+  return mutate({
+    method: "DELETE",
+    path: `/api/calendar/${entryId}/occurrences/${day}`,
+    accountId,
+    entryId,
+    apply: () =>
+      updateCalendar(accountId, (list) =>
+        list.map((e) => (e.id === entryId ? { ...e, exceptions: [...new Set([...(e.exceptions || []), day])].sort() } : e)),
+      ),
+    onResult: replaceEntry,
+    success: "Ocorrência excluída.",
+  });
+}
+
+/** Altera só uma ocorrência: ela sai da série e vira um evento avulso (como no Outlook). */
+export function detachOccurrence(accountId, entryId, day, changes, { success = "Só esta ocorrência foi alterada." } = {}) {
+  const id = uid();
+  const series = localEntry(accountId, entryId);
+  return mutate({
+    method: "POST",
+    path: `/api/calendar/${entryId}/occurrences/${day}`,
+    body: { id, ...changes },
+    accountId,
+    entryId,
+    apply: () =>
+      updateCalendar(accountId, (list) => {
+        if (!series) return list;
+        const span = diffDays(series.start_date, series.end_date);
+        const single = normalizeEntry({
+          ...series,
+          start_date: day,
+          end_date: addDays(day, span),
+          ...changes,
+          id,
+          recurrence: null,
+          exceptions: [],
+        });
+        return [...list.map((e) => (e.id === entryId ? { ...e, exceptions: [...new Set([...(e.exceptions || []), day])].sort() } : e)), single];
+      }),
+    onResult: (result) => {
+      replaceEntry(result.series);
+      replaceEntry(result.entry);
+    },
+    success,
   });
 }
 
