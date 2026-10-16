@@ -1,5 +1,5 @@
 """Gera uma equipe de demonstração com histórico realista (útil para testar o dashboard e o RNF09),
-incluindo a agenda de cada conta na aba Calendário.
+incluindo a agenda de cada conta na aba Calendário e a Daily de ontem, hoje e amanhã.
 
 Uso:
     python -m app.demo                      # cria dados se o banco estiver vazio
@@ -137,6 +137,33 @@ def _calendar(ctx, rng: random.Random, account, today, manager_name: str, is_man
     )
 
 
+DAILY = [
+    "Responder e-mails do cliente",
+    "Revisar a planilha de horas",
+    "Ligar para o fornecedor",
+    "Conferir a agenda do dia",
+    "Enviar o relatório para a Marina",
+    "Atualizar o quadro da sprint",
+    "Separar os documentos da reunião",
+    "Organizar a caixa de entrada",
+]
+
+
+def _daily(ctx, rng: random.Random, account, today, now: datetime) -> None:
+    """Daily: ontem (com uma pendência que aparece hoje), hoje e amanhã."""
+    titles = rng.sample(DAILY, 7)
+    plan = [(-1, True), (-1, False), (-1, True), (0, True), (0, False), (0, False), (1, False)]
+    for index, ((offset, done), title) in enumerate(zip(plan, titles)):
+        when = now + timedelta(days=min(offset, 0), hours=-8 + index)
+        item = commands.create_daily_item(
+            ctx(account, when),
+            account.id,
+            {"title": title, "day": (today + timedelta(days=offset)).isoformat(), "note": "Prazo: fim do dia." if index == 4 else ""},
+        )
+        if done:
+            commands.update_daily_item(ctx(account, when + timedelta(hours=1)), item.id, {"done": True})
+
+
 def _at(rng: random.Random, day: datetime, tz) -> datetime:
     local = datetime.combine(day.date(), time(rng.randint(8, 18), rng.randint(0, 59)), tz)
     return local.astimezone(utcnow().tzinfo)
@@ -251,6 +278,7 @@ def seed(tasks_per_member: int = 200, seed_value: int = 42) -> dict:
             today = now.astimezone(tz).date()
             for account in accounts:
                 _calendar(ctx(account, now - timedelta(days=60)), rng, account, today, manager.name, account.id == manager.id)
+                _daily(ctx, rng, account, today, now)
         return {"accounts": len(accounts), "tasks": total}
     finally:
         conn.close()

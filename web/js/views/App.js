@@ -1,4 +1,4 @@
-// Estrutura do app: cabeçalho com abas (incluindo o Calendário), indicador de salvamento (RF69), menu da conta (RF26),
+// Estrutura do app: cabeçalho com abas (incluindo Daily e Calendário), indicador de salvamento (RF69), menu da conta (RF26),
 // criação de tarefa em 1 clique de qualquer tela (RNF10), gaveta de detalhes e painel de drill-down.
 import { html, cx } from "../lib/html.js";
 import { useEffect } from "preact/hooks";
@@ -10,6 +10,7 @@ import { AccountPicker } from "./AccountPicker.js";
 import { TodayView } from "./TodayView.js";
 import { TasksView } from "./TasksView.js";
 import { CalendarView } from "./CalendarView.js";
+import { DailyView } from "./DailyView.js";
 import { GoalsView, GoalDetailView } from "./GoalsView.js";
 import { PerformanceView } from "./PerformanceView.js";
 import { TeamView, MemberProfileView } from "./TeamView.js";
@@ -23,6 +24,7 @@ import { navigate, openModal, switchAccount } from "../actions.js";
 
 const MEMBER_TABS = [
   { key: "hoje", label: "Hoje", icon: "sun" },
+  { key: "daily", label: "Daily", icon: "checkSquare" },
   { key: "tarefas", label: "Tarefas", icon: "list" },
   { key: "calendario", label: "Calendário", icon: "calendar" },
   { key: "metas", label: "Metas", icon: "target" },
@@ -32,6 +34,7 @@ const MEMBER_TABS = [
 const MANAGER_TABS = [
   { key: "equipe", label: "Painel", icon: "dashboard" },
   { key: "hoje", label: "Hoje", icon: "sun" },
+  { key: "daily", label: "Daily", icon: "checkSquare" },
   { key: "tarefas", label: "Tarefas", icon: "list" },
   { key: "calendario", label: "Calendário", icon: "calendar" },
   { key: "metas", label: "Metas", icon: "target" },
@@ -136,6 +139,8 @@ function Page({ route }) {
   switch (route.name) {
     case "hoje":
       return html`<${TodayView} />`;
+    case "daily":
+      return html`<${DailyView} />`;
     case "tarefas":
       return html`<${TasksView} />`;
     case "calendario":
@@ -149,7 +154,7 @@ function Page({ route }) {
     case "equipe":
       return html`<${TeamView} />`;
     case "membro":
-      return html`<${MemberProfileView} accountId=${route.params.accountId} tab=${route.params.tab} goalId=${route.params.meta} week=${route.params.semana} />`;
+      return html`<${MemberProfileView} accountId=${route.params.accountId} tab=${route.params.tab} goalId=${route.params.meta} week=${route.params.semana} day=${route.params.dia} />`;
     case "conta":
       return html`<${SettingsView} />`;
     default:

@@ -17,7 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .api import routes_accounts, routes_calendar, routes_metrics, routes_tasks, routes_tools
+from .api import routes_accounts, routes_calendar, routes_daily, routes_metrics, routes_tasks, routes_tools
 from .config import WEB_DIR, get_settings
 from .domain.rules import DomainError
 from .integrations.scheduler import run_scheduler
@@ -50,7 +50,9 @@ FIELD_LABELS = {
     "interval": "intervalo da repetição",
     "weekdays": "dias da semana",
     "until": "fim da repetição",
-    "day": "data da ocorrência",
+    "occurrence": "data da ocorrência",
+    "note": "anotação",
+    "day": "data",
 }
 
 
@@ -168,6 +170,7 @@ def create_app() -> FastAPI:
     app.include_router(routes_accounts.router)
     app.include_router(routes_tasks.router)
     app.include_router(routes_calendar.router)
+    app.include_router(routes_daily.router)
     app.include_router(routes_metrics.router)
     app.include_router(routes_tools.router)
 

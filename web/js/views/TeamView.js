@@ -1,5 +1,5 @@
 // Aba Equipe (RF34) e Painel da equipe do Gestor (RF62, RN34); perfil do membro em modo somente leitura
-// (RF35–RF37, RF63), com o calendário da conta, e atribuição de tarefas pelo Gestor (RF64).
+// (RF35–RF37, RF63), com a Daily e o calendário da conta, e atribuição de tarefas pelo Gestor (RF64).
 import { html, cx } from "../lib/html.js";
 import { useEffect } from "preact/hooks";
 import { useStore } from "../lib/store.js";
@@ -9,6 +9,7 @@ import { TaskFilters, TaskSections, useTaskFilters } from "./TasksView.js";
 import { GoalsList, GoalDetailView } from "./GoalsView.js";
 import { Dashboard, PeriodFilter, usePeriod } from "./PerformanceView.js";
 import { CalendarWeek } from "./CalendarView.js";
+import { DailyDay } from "./DailyView.js";
 import { PHASE_COLOR, PHASE_LABEL } from "../lib/rules.js";
 import { plural } from "../lib/format.js";
 import { ensureBoard, loadTeam, navigate, openModal } from "../actions.js";
@@ -125,7 +126,7 @@ export function TeamView() {
 }
 
 /** Perfil do membro (RF35–RF37); o Gestor também acompanha o dashboard (RF63). */
-export function MemberProfileView({ accountId, tab = "tarefas", goalId, week }) {
+export function MemberProfileView({ accountId, tab = "tarefas", goalId, week, day }) {
   const account = useStore((s) => (s.accounts || []).find((a) => a.id === accountId));
   const me = useStore((s) => (s.accounts || []).find((a) => a.id === s.meId));
   const board = useStore((s) => s.boards[accountId]);
@@ -139,11 +140,12 @@ export function MemberProfileView({ accountId, tab = "tarefas", goalId, week }) 
 
   if (!account) return html`<${EmptyState} icon="users" title="Conta não encontrada" action=${html`<${Button} onClick=${() => navigate("equipe")}>Voltar<//>`} />`;
   if (me && accountId === me.id) {
-    navigate(["desempenho", "metas", "calendario"].includes(tab) ? tab : "tarefas");
+    navigate(["desempenho", "metas", "calendario", "daily"].includes(tab) ? tab : "tarefas");
     return null;
   }
   const tabs = [
     { key: "tarefas", label: "Tarefas", icon: "list" },
+    { key: "daily", label: "Daily", icon: "checkSquare" },
     { key: "calendario", label: "Calendário", icon: "calendar" },
     { key: "metas", label: "Metas", icon: "target" },
     ...(manager ? [{ key: "desempenho", label: "Desempenho", icon: "chart" }] : []),
@@ -179,21 +181,23 @@ export function MemberProfileView({ accountId, tab = "tarefas", goalId, week }) 
 
     ${!board
       ? html`<${Skeleton} count=${4} />`
-      : tab === "calendario"
-        ? html`<${CalendarWeek} accountId=${accountId} week=${week} basePath=${`equipe/${accountId}/calendario`} readOnly />`
-        : tab === "metas"
-          ? goalId
-            ? html`<${GoalDetailView} goalId=${goalId} accountId=${accountId} readOnly />`
-            : html`<${GoalsList} board=${board} readOnly onOpen=${(goal) => navigate(`equipe/${accountId}/metas?meta=${goal.id}`)} />`
-          : tab === "desempenho" && manager
-            ? html`<div class="stack" style="gap:16px">
-                <div class="toolbar toolbar-row" role="toolbar" aria-label="Filtros"><${PeriodFilter} value=${period} onChange=${setPeriod} /></div>
-                <${Dashboard} accountId=${accountId} period=${period} />
-              </div>`
-            : html`<div class="stack" style="gap:18px">
-                <section class="toolbar" aria-label="Filtrar tarefas"><${TaskFilters} filters=${filters} tasks=${board.tasks} staleDays=${staleDays} /></section>
-                <${TaskSections} tasks=${filters.apply(board.tasks, staleDays)} readOnly staleDays=${staleDays} goals=${board.goals} emptyText="Nenhuma tarefa pendente." />
-              </div>`}
+      : tab === "daily"
+        ? html`<${DailyDay} accountId=${accountId} day=${day} basePath=${`equipe/${accountId}/daily`} readOnly />`
+        : tab === "calendario"
+          ? html`<${CalendarWeek} accountId=${accountId} week=${week} basePath=${`equipe/${accountId}/calendario`} readOnly />`
+          : tab === "metas"
+            ? goalId
+              ? html`<${GoalDetailView} goalId=${goalId} accountId=${accountId} readOnly />`
+              : html`<${GoalsList} board=${board} readOnly onOpen=${(goal) => navigate(`equipe/${accountId}/metas?meta=${goal.id}`)} />`
+            : tab === "desempenho" && manager
+              ? html`<div class="stack" style="gap:16px">
+                  <div class="toolbar toolbar-row" role="toolbar" aria-label="Filtros"><${PeriodFilter} value=${period} onChange=${setPeriod} /></div>
+                  <${Dashboard} accountId=${accountId} period=${period} />
+                </div>`
+              : html`<div class="stack" style="gap:18px">
+                  <section class="toolbar" aria-label="Filtrar tarefas"><${TaskFilters} filters=${filters} tasks=${board.tasks} staleDays=${staleDays} /></section>
+                  <${TaskSections} tasks=${filters.apply(board.tasks, staleDays)} readOnly staleDays=${staleDays} goals=${board.goals} emptyText="Nenhuma tarefa pendente." />
+                </div>`}
     <p class="xsmall faint"><${Icon} name="eye" size=${12} style="display:inline;vertical-align:-2px" /> Modo somente leitura: criação, edição, marcação e exclusão ficam bloqueadas no perfil de outra conta.${manager ? " Como Gestor, você pode atribuir tarefas e comentar." : ""}</p>
   </div>`;
 }

@@ -1,7 +1,8 @@
 # Organizador de Tarefas
 
 Aplicação web para a equipe organizar tarefas em etapas, agrupadas em metas, com fases de
-desenvolvimento, calendário semanal com anotações, dashboard de desempenho e acompanhamento pelo Gestor.
+desenvolvimento, Daily (tarefas simples do dia), calendário semanal com anotações, dashboard de desempenho e
+acompanhamento pelo Gestor.
 Implementa a especificação
 **v1.2 (23/09/2026)**: requisitos funcionais RF01–RF71, regras RN01–RN36 e não funcionais RNF01–RNF25.
 
@@ -91,13 +92,29 @@ A aba **Calendário** mostra a semana em grade de horários, como no Outlook:
 Como o resto do app, tudo é salvo na hora, funciona offline (fila local) e fica no histórico de eventos.
 API: `/api/accounts/{id}/calendar` e `/api/calendar/{id}` (detalhes em `/api/docs`).
 
+## Daily
+
+A aba **Daily** é a lista de tarefas simples do dia, como o *Meu Dia* do Microsoft To Do:
+
+- **Adicionar:** digite no campo do topo e pressione Enter; a mais recente fica no topo da lista.
+- **Concluir:** marque o círculo. As concluídas vão para **Concluídas**, que pode ser recolhida.
+- **Anotação:** clique no item para editar o título e escrever uma anotação (salvos sozinhos).
+- **Pendências:** o que não for concluído aparece no topo de **Hoje**, em *De dias anteriores*, com o dia de
+  origem, até ser concluído ou excluído.
+- **Dias:** navegue com ‹ › ou escolha uma data para ver dias anteriores e planejar os próximos. **Para hoje**,
+  **Para amanhã** e *Mover para* mudam o dia de um item.
+- **Excluir:** a lixeira exclui na hora, com **Desfazer** no aviso.
+- **Equipe:** colegas e Gestor veem a Daily em *Equipe → perfil → Daily*, em modo somente leitura.
+
+API: `/api/accounts/{id}/daily` e `/api/daily/{id}`.
+
 ## Testes (RNF15)
 
 ```powershell
 .\run.ps1 -Test
 ```
 
-São 130 testes (pytest) cobrindo regras de negócio, calendário, métricas, previsões, integrações e fluxos
+São 137 testes (pytest) cobrindo regras de negócio, Daily, calendário, métricas, previsões, integrações e fluxos
 completos da API. Cobertura: 95% no total e ~99% nos módulos de regras (`app/domain`) e métricas (`app/metrics`).
 
 ## Arquitetura (RNF14, RNF22)
@@ -168,6 +185,11 @@ Pontos em que a especificação admite mais de uma leitura. A regra adotada est�
     visualiza); *Particular* esconde título, local e anotações das outras contas, mas **não** é controle de
     acesso (RN11). Em conflito, vale a alteração mais recente de cada campo (RN30), com data e horário
     tratados juntos.
+15. **Daily (aba nova, além da especificação v1.2).** Os itens são separados das tarefas: sem etapas, prazo,
+    fase nem métricas. Uma pendência continua com o dia em que foi planejada: aparece nesse dia e também no topo
+    de Hoje; concluída hoje, entra nas concluídas de hoje. Sem data, um item novo vai para o dia em que a ação
+    ocorreu (fuso do navegador). Só o dono cria e edita. Em conflito, vale a alteração mais recente de cada
+    campo (título, anotação, dia e conclusão — RN30).
 
 ## Dados de demonstração
 
