@@ -25,11 +25,14 @@ def test_demo_seed_builds_consistent_history(settings_env):
         agenda = repo.list_calendar_entries(conn, member.id)
         assert any(e.recurrence and e.exceptions for e in agenda) and any(e.private for e in agenda)
         assert all(repo.list_calendar_entries(conn, a.id) for a in accounts)
+        daily = repo.list_daily_items(conn, member.id)
+        assert len(daily) == 7 and sum(i.done for i in daily) == 3
         with db.write_transaction(conn):
             projector.rebuild_projections(conn)
         rebuilt = repo.list_tasks(conn, member.id)
         assert [(t.id, t.status, t.due_date, len(t.steps)) for t in sorted(rebuilt, key=lambda t: t.id)] == snapshot
         assert repo.list_calendar_entries(conn, member.id) == agenda
+        assert repo.list_daily_items(conn, member.id) == daily
     finally:
         conn.close()
 

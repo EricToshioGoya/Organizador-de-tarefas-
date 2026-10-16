@@ -335,14 +335,14 @@ def test_existing_database_gets_calendar_table(settings_env):
     conn = sqlite3.connect(path)
     start = db.SCHEMA.index("-- Calendário")
     end = db.SCHEMA.index("-- Operacional")
-    conn.executescript(db.SCHEMA[:start] + db.SCHEMA[end:])  # esquema v2, sem o calendário
+    conn.executescript(db.SCHEMA[:start] + db.SCHEMA[end:])  # esquema v2, sem o calendário (nem a Daily)
     conn.close()
 
     db.init_db(path)
     conn = db.connect(path)
     try:
         assert conn.execute("SELECT COUNT(*) FROM calendar_entries").fetchone()[0] == 0
-        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()["value"] == "3"
+        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()["value"] == str(db.SCHEMA_VERSION)
     finally:
         conn.close()
 

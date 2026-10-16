@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import date
 from typing import Iterable
 
-from ..domain.models import Account, CalendarEntry, Goal, Step, Task
+from ..domain.models import Account, CalendarEntry, DailyItem, Goal, Step, Task
 from ..domain.timeutil import parse_date, parse_iso
 
 
@@ -371,6 +371,44 @@ def list_calendar_entries(conn: sqlite3.Connection, account_id: str) -> list[Cal
 
 def calendar_field_ts(conn: sqlite3.Connection, entry_id: str) -> dict:
     row = conn.execute("SELECT field_ts FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+    return _json(row["field_ts"], {}) if row else {}
+
+
+# ---------------------------------------------------------------------------
+# Daily
+# ---------------------------------------------------------------------------
+
+
+def daily_item_from_row(row: sqlite3.Row) -> DailyItem:
+    return DailyItem(
+        id=row["id"],
+        account_id=row["account_id"],
+        title=row["title"],
+        day=parse_date(row["day"]),  # type: ignore[arg-type]
+        note=row["note"],
+        done=bool(row["done"]),
+        done_at=parse_iso(row["done_at"]),
+        created_at=parse_iso(row["created_at"]),
+        updated_at=parse_iso(row["updated_at"]),
+    )
+
+
+def get_daily_item(conn: sqlite3.Connection, item_id: str | None) -> DailyItem | None:
+    if not item_id:
+        return None
+    row = conn.execute("SELECT * FROM daily_items WHERE id = ?", (item_id,)).fetchone()
+    return daily_item_from_row(row) if row else None
+
+
+def list_daily_items(conn: sqlite3.Connection, account_id: str) -> list[DailyItem]:
+    rows = conn.execute(
+        "SELECT * FROM daily_items WHERE account_id = ? ORDER BY day, created_at, id", (account_id,)
+    ).fetchall()
+    return [daily_item_from_row(r) for r in rows]
+
+
+def daily_field_ts(conn: sqlite3.Connection, item_id: str) -> dict:
+    row = conn.execute("SELECT field_ts FROM daily_items WHERE id = ?", (item_id,)).fetchone()
     return _json(row["field_ts"], {}) if row else {}
 
 

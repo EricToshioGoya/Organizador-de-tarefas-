@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from ..domain import rules
 from ..domain.constants import PRIVATE_EVENT_COLOR, PRIVATE_EVENT_TITLE
-from ..domain.models import Account, CalendarEntry, Goal, Task
+from ..domain.models import Account, CalendarEntry, DailyItem, Goal, Task
 from ..domain.timeutil import date_iso, local_date, to_iso
 from ..metrics import capacity
 from ..metrics.common import first_activity_day
@@ -150,6 +150,20 @@ def calendar_entry_json(entry: CalendarEntry, viewer: Account | None) -> dict:
     }
 
 
+def daily_item_json(item: DailyItem) -> dict:
+    return {
+        "id": item.id,
+        "account_id": item.account_id,
+        "day": date_iso(item.day),
+        "title": item.title,
+        "note": item.note,
+        "done": item.done,
+        "done_at": to_iso(item.done_at),
+        "created_at": to_iso(item.created_at),
+        "updated_at": to_iso(item.updated_at),
+    }
+
+
 def task_payload(conn: sqlite3.Connection, task: Task, viewer: Account | None) -> dict:
     attachments = repo.attachments_by_task(conn, [task.id]).get(task.id, [])
     comments = None
@@ -188,4 +202,5 @@ def board_json(conn: sqlite3.Connection, account: Account, viewer: Account | Non
         "requesters": repo.list_requesters(conn, account.id) if own else [],
         "overload": capacity.overload(tasks, today, tz, first_activity_day(tasks, tz)),
         "calendar": [calendar_entry_json(e, viewer) for e in repo.list_calendar_entries(conn, account.id)],
+        "daily": [daily_item_json(i) for i in repo.list_daily_items(conn, account.id)],
     }

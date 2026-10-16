@@ -20,7 +20,7 @@ from ..domain.constants import (
     TEXT_MAX,
     TITLE_MAX,
 )
-from ..domain.models import Account, CalendarEntry, Goal, Task
+from ..domain.models import Account, CalendarEntry, DailyItem, Goal, Task
 from ..domain.rules import DomainError, not_found, read_only
 from ..domain.timeutil import date_iso, local_date, parse_date, today_in, utcnow, week_start
 from ..metrics import weekly
@@ -877,6 +877,81 @@ def detach_occurrence(ctx: Ctx, entry_id: str, day: object, changes: dict) -> tu
     series = repo.get_calendar_entry(ctx.conn, entry_id)
     created = repo.get_calendar_entry(ctx.conn, new_entry_id)
     return series, created  # type: ignore[return-value]
+
+
+# ---------------------------------------------------------------------------
+# Daily: tarefas simples do dia (como no Microsoft To Do)
+# ---------------------------------------------------------------------------
+
+
+def _daily_for_edit(ctx: Ctx, item_id: str) -> DailyItem:
+    item = repo.get_daily_item(ctx.conn, item_id)
+    if item is None:
+        raise not_found("Item da Daily")
+    _own(ctx, item.account_id)
+    return item
+
+
+def _daily_day(value: object) -> str:
+    day = _date(value, "Data")
+    if day is None:
+        raise DomainError("Informe a data.", code="data_invalida")
+    return date_iso(day)  # type: ignore[arg-type]
+
+
+def create_daily_item(ctx: Ctx, account_id: str, data: dict) -> DailyItem:
+    """Só a própria conta anota na sua Daily. Sem data, vale o dia em que a ação ocorreu."""
+    _own(ctx, account_id)
+    item_id = clean_id(data.get("id")) or new_id()
+    existing = repo.get_daily_item(ctx.conn, item_id)
+    if existing is not None:
+        if existing.account_id == account_id:
+            return existing  # reenvio da fila offline (RF71)
+        raise DomainError("Identificador de item já utilizado.", code="conflito", status=409)
+    payload = {
+        "title": rules.clean_title(data.get("title")),
+        "note": rules.clean_text(data.get("note") or "", TEXT_MAX),
+        "day": _daily_day(data.get("day") or ctx.action_day),
+    }
+    ctx.emit("ItemDailyCriado", "daily", item_id, account_id=account_id, payload=payload)
+    return repo.get_daily_item(ctx.conn, item_id)  # type: ignore[return-value]
+
+
+def update_daily_item(ctx: Ctx, item_id: str, changes: dict) -> DailyItem:
+    """Título, anotação, dia e conclusão; em conflito, vale a alteração mais recente de cada campo (RN30)."""
+    item = _daily_for_edit(ctx, item_id)
+    stamps = repo.daily_field_ts(ctx.conn, item_id)
+    cleaners = {
+        "title": rules.clean_title,
+        "note": lambda v: rules.clean_text(v or "", TEXT_MAX),
+        "day": _daily_day,
+    }
+    current = {"title": item.title, "note": item.note, "day": date_iso(item.day)}
+    diff: dict[str, dict] = {}
+    for field, clean in cleaners.items():
+        if field in changes and _newer(ctx, stamps, field):
+            value = clean(changes[field])
+            if value != current[field]:
+                diff[field] = {"old": current[field], "new": value}
+    if diff:
+        ctx.emit("ItemDailyEditado", "daily", item_id, account_id=item.account_id, payload={"changes": diff})
+    if "done" in changes and _newer(ctx, stamps, "done") and bool(changes["done"]) != item.done:
+        ctx.emit(
+            "ItemDailyConcluido" if changes["done"] else "ItemDailyReaberto",
+            "daily",
+            item_id,
+            account_id=item.account_id,
+            payload={"title": diff.get("title", {}).get("new", item.title)},
+        )
+    return repo.get_daily_item(ctx.conn, item_id)  # type: ignore[return-value]
+
+
+def delete_daily_item(ctx: Ctx, item_id: str) -> None:
+    item = repo.get_daily_item(ctx.conn, item_id)
+    if item is None:
+        return  # já excluído (reenvio)
+    _own(ctx, item.account_id)
+    ctx.emit("ItemDailyExcluido", "daily", item_id, account_id=item.account_id, payload={"title": item.title})
 
 
 # ---------------------------------------------------------------------------

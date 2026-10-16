@@ -59,25 +59,25 @@ def delete_entry(entry_id: str, rc: RequestContext = Depends(request_context)):
 
 
 @router.delete(
-    "/calendar/{entry_id}/occurrences/{day}",
+    "/calendar/{entry_id}/occurrences/{occurrence}",
     response_model=schemas.CalendarEntryOut,
     summary="Excluir só uma ocorrência de um evento que se repete",
 )
-def delete_occurrence(entry_id: str, day: date, rc: RequestContext = Depends(request_context)):
-    return mutate(rc, lambda ctx: _entry_out(ctx, commands.exclude_occurrence(ctx, entry_id, day)))
+def delete_occurrence(entry_id: str, occurrence: date, rc: RequestContext = Depends(request_context)):
+    return mutate(rc, lambda ctx: _entry_out(ctx, commands.exclude_occurrence(ctx, entry_id, occurrence)))
 
 
 @router.post(
-    "/calendar/{entry_id}/occurrences/{day}",
+    "/calendar/{entry_id}/occurrences/{occurrence}",
     status_code=201,
     response_model=schemas.OccurrenceOut,
     summary="Alterar só uma ocorrência: ela sai da série e vira um evento avulso",
 )
-def edit_occurrence(entry_id: str, day: date, body: schemas.OccurrenceEdit, rc: RequestContext = Depends(request_context)):
+def edit_occurrence(entry_id: str, occurrence: date, body: schemas.OccurrenceEdit, rc: RequestContext = Depends(request_context)):
     changes = body.model_dump(exclude_unset=True)
 
     def run(ctx):
-        series, entry = commands.detach_occurrence(ctx, entry_id, day, changes)
+        series, entry = commands.detach_occurrence(ctx, entry_id, occurrence, changes)
         return {"series": _entry_out(ctx, series), "entry": _entry_out(ctx, entry)}
 
     return mutate(rc, run, status=201)

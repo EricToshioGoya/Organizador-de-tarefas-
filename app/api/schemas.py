@@ -225,6 +225,20 @@ class OccurrenceEdit(CalendarEntryUpdate):
     id: str | None = Field(None, description="ID do novo evento avulso, gerado no cliente (opcional).")
 
 
+class DailyItemCreate(Model):
+    id: str | None = Field(None, description="ID gerado no cliente (opcional; permite reenvio idempotente).")
+    title: str = Field(..., examples=["Responder e-mails"])
+    note: str = Field("", description="Anotação livre.")
+    day: date | None = Field(None, description="Dia planejado. Padrão: o dia em que a ação ocorreu (fuso do navegador).")
+
+
+class DailyItemUpdate(Model):
+    title: str | None = None
+    note: str | None = None
+    day: date | None = Field(None, description="Move o item para outro dia.")
+    done: bool | None = Field(None, description="Concluir (true) ou reabrir (false).")
+
+
 # ---------------------------------------------------------------------------
 # Saídas (documentação)
 # ---------------------------------------------------------------------------
@@ -377,6 +391,18 @@ class OccurrenceOut(BaseModel):
     entry: CalendarEntryOut
 
 
+class DailyItemOut(BaseModel):
+    id: str
+    account_id: str
+    day: str = Field(..., description="Dia planejado. Pendente de dia anterior aparece também em Hoje.")
+    title: str
+    note: str
+    done: bool
+    done_at: str | None
+    created_at: str
+    updated_at: str
+
+
 class BoardOut(BaseModel):
     seq: int
     account: AccountOut
@@ -389,6 +415,7 @@ class BoardOut(BaseModel):
     requesters: list[str]
     overload: dict
     calendar: list[CalendarEntryOut]
+    daily: list[DailyItemOut]
 
 
 class ChangesOut(BaseModel):

@@ -63,6 +63,7 @@ export function parseHash(hash = location.hash) {
   const [name = "", a, b] = parts;
   switch (name) {
     case "hoje":
+    case "daily":
     case "tarefas":
     case "calendario":
     case "metas":
@@ -300,10 +301,11 @@ function me() {
   return getState().meId;
 }
 
-function mutate({ method, path, body, accountId, taskId, entryId, apply, onResult, success }) {
+function mutate({ method, path, body, accountId, taskId, itemId, apply, onResult, success }) {
   apply?.(); // a interface responde na hora (RNF09: ≤ 100 ms); o servidor confirma em seguida
-  const promise = enqueue({ method, path, body, account: me(), meta: { accountId, taskId, entryId } });
-  const sameItem = (meta) => (taskId ? meta.taskId === taskId : entryId ? meta.entryId === entryId : meta.accountId === accountId);
+  const promise = enqueue({ method, path, body, account: me(), meta: { accountId, taskId, itemId } });
+  // itemId identifica eventos do calendário e itens da Daily
+  const sameItem = (meta) => (taskId ? meta.taskId === taskId : itemId ? meta.itemId === itemId : meta.accountId === accountId);
   return promise.then(
     (result) => {
       // Aplica a resposta do servidor só se não houver outra alteração pendente no mesmo item.
@@ -703,7 +705,7 @@ export function createEntry(accountId, data) {
     path: `/api/accounts/${accountId}/calendar`,
     body: { id, ...data },
     accountId,
-    entryId: id,
+    itemId: id,
     apply: () => updateCalendar(accountId, (list) => [...list, optimistic]),
     onResult: replaceEntry,
     success: "Evento criado.",
@@ -717,7 +719,7 @@ export function updateEntry(accountId, entryId, changes, { success } = {}) {
     path: `/api/calendar/${entryId}`,
     body: changes,
     accountId,
-    entryId,
+    itemId: entryId,
     apply: () => updateCalendar(accountId, (list) => list.map((e) => (e.id === entryId ? normalizeEntry({ ...e, ...changes, updated_at: new Date().toISOString() }) : e))),
     onResult: replaceEntry,
     success,
@@ -729,7 +731,7 @@ export function deleteEntry(accountId, entryId, { success = "Evento excluído." 
     method: "DELETE",
     path: `/api/calendar/${entryId}`,
     accountId,
-    entryId,
+    itemId: entryId,
     apply: () => updateCalendar(accountId, (list) => list.filter((e) => e.id !== entryId)),
     success,
   });
@@ -741,7 +743,7 @@ export function excludeOccurrence(accountId, entryId, day) {
     method: "DELETE",
     path: `/api/calendar/${entryId}/occurrences/${day}`,
     accountId,
-    entryId,
+    itemId: entryId,
     apply: () =>
       updateCalendar(accountId, (list) =>
         list.map((e) => (e.id === entryId ? { ...e, exceptions: [...new Set([...(e.exceptions || []), day])].sort() } : e)),
@@ -760,7 +762,7 @@ export function detachOccurrence(accountId, entryId, day, changes, { success = "
     path: `/api/calendar/${entryId}/occurrences/${day}`,
     body: { id, ...changes },
     accountId,
-    entryId,
+    itemId: entryId,
     apply: () =>
       updateCalendar(accountId, (list) => {
         if (!series) return list;
@@ -782,6 +784,79 @@ export function detachOccurrence(accountId, entryId, day, changes, { success = "
     },
     success,
   });
+}
+
+// Daily: tarefas simples do dia (como no Microsoft To Do)
+
+function updateDaily(accountId, fn) {
+  updateBoard(accountId, (board) => ({ ...board, daily: fn(board.daily || []) }));
+}
+
+function replaceDailyItem(item) {
+  updateDaily(item.account_id, (list) =>
+    list.some((i) => i.id === item.id) ? list.map((i) => (i.id === item.id ? item : i)) : [...list, item],
+  );
+}
+
+export function createDailyItem(accountId, data, { id = uid() } = {}) {
+  const now = new Date().toISOString();
+  const optimistic = { id, account_id: accountId, note: "", ...data, done: false, done_at: null, created_at: now, updated_at: now };
+  return mutate({
+    method: "POST",
+    path: `/api/accounts/${accountId}/daily`,
+    body: { id, ...data },
+    accountId,
+    itemId: id,
+    apply: () => updateDaily(accountId, (list) => [...list.filter((i) => i.id !== id), optimistic]),
+    onResult: replaceDailyItem,
+  }).then(() => id);
+}
+
+/** Título, anotação, dia (mover) e conclusão. */
+export function updateDailyItem(accountId, itemId, changes) {
+  return mutate({
+    method: "PATCH",
+    path: `/api/daily/${itemId}`,
+    body: changes,
+    accountId,
+    itemId,
+    apply: () =>
+      updateDaily(accountId, (list) =>
+        list.map((i) => {
+          if (i.id !== itemId) return i;
+          const now = new Date().toISOString();
+          const next = { ...i, ...changes, updated_at: now };
+          if ("done" in changes && changes.done !== i.done) next.done_at = changes.done ? now : null;
+          return next;
+        }),
+      ),
+    onResult: replaceDailyItem,
+  });
+}
+
+/** Exclui na hora, com "Desfazer": o item volta com o mesmo ID, dia, anotação e conclusão. */
+export function deleteDailyItem(accountId, itemId) {
+  const item = (getState().boards[accountId]?.daily || []).find((i) => i.id === itemId);
+  const promise = mutate({
+    method: "DELETE",
+    path: `/api/daily/${itemId}`,
+    accountId,
+    itemId,
+    apply: () => updateDaily(accountId, (list) => list.filter((i) => i.id !== itemId)),
+  });
+  if (item) {
+    toast(`“${item.title}” excluída.`, "success", {
+      duration: 6000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          createDailyItem(accountId, { title: item.title, note: item.note, day: item.day }, { id: item.id });
+          if (item.done) updateDailyItem(accountId, item.id, { done: true });
+        },
+      },
+    });
+  }
+  return promise;
 }
 
 // Comentários (RF66–RF68)

@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 # Eventos (fonte da verdade) + projeções (modelos de leitura reconstruíveis a partir dos eventos).
 SCHEMA = """
@@ -193,6 +193,22 @@ CREATE TABLE IF NOT EXISTS calendar_entries (
 );
 CREATE INDEX IF NOT EXISTS ix_calendar_account ON calendar_entries(account_id, start_date);
 
+-- Daily: tarefas simples do dia (título, anotação, dia planejado e conclusão).
+CREATE TABLE IF NOT EXISTS daily_items (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    title TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    done INTEGER NOT NULL DEFAULT 0,
+    done_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    field_ts TEXT NOT NULL DEFAULT '{}',
+    version INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS ix_daily_account ON daily_items(account_id, day);
+
 -- Operacional (não é estado de domínio): controle de envio do resumo diário (RF56).
 CREATE TABLE IF NOT EXISTS digest_log (
     account_id TEXT NOT NULL,
@@ -217,6 +233,7 @@ PROJECTION_TABLES = (
     "top3",
     "weekly_reviews",
     "calendar_entries",
+    "daily_items",
 )
 
 WRITE_LOCK = threading.RLock()

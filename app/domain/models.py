@@ -1,4 +1,4 @@
-"""Modelos do domínio (seção 2.2 — tarefa; 2.8 — meta; 2.7 — conta; evento do calendário)."""
+"""Modelos do domínio (seção 2.2 — tarefa; 2.8 — meta; 2.7 — conta; evento do calendário; item da Daily)."""
 
 from __future__ import annotations
 
@@ -121,3 +121,22 @@ class CalendarEntry:
     @property
     def is_recurring(self) -> bool:
         return bool(self.recurrence)
+
+
+@dataclass
+class DailyItem:
+    """Item da Daily: tarefa simples planejada para um dia, como no Microsoft To Do.
+
+    Enquanto não for concluído, um item de dia anterior aparece também no dia de hoje (a interface o mostra
+    no topo); `day` continua sendo o dia em que foi planejado.
+    """
+
+    id: str
+    account_id: str
+    title: str
+    day: date
+    note: str = ""
+    done: bool = False
+    done_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
