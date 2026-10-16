@@ -112,7 +112,7 @@ def weekly_review_seen(account_id: str, week: str, rc: RequestContext = Depends(
 @router.get(
     "/accounts/{account_id}/calendar.ics",
     tags=["Integrações"],
-    summary="Feed de calendário assinável (RF55)",
+    summary="Feed de calendário assinável: entregas e eventos do calendário (RF55)",
     response_class=Response,
     responses={200: {"content": {"text/calendar": {}}}},
 )
@@ -120,11 +120,17 @@ def calendar_feed(account_id: str, conn: sqlite3.Connection = Depends(read_conne
     account = repo.get_account(conn, account_id)
     if account is None:
         raise not_found("Conta")
-    body = ics.build_calendar(account.name, repo.list_tasks(conn, account_id), utcnow(), get_settings().public_url)
+    body = ics.build_calendar(
+        account.name,
+        repo.list_tasks(conn, account_id),
+        utcnow(),
+        get_settings().public_url,
+        repo.list_calendar_entries(conn, account_id),
+    )
     return Response(
         body,
         media_type="text/calendar; charset=utf-8",
-        headers={"Content-Disposition": 'inline; filename="entregas.ics"', "Cache-Control": "no-cache"},
+        headers={"Content-Disposition": 'inline; filename="agenda.ics"', "Cache-Control": "no-cache"},
     )
 
 

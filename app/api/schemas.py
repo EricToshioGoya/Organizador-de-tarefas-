@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,6 +13,9 @@ Phase = Literal["planejamento", "producao", "alpha", "beta", "concluido"]
 Role = Literal["membro", "gestor"]
 PostponeReason = Literal["subestimei", "prioridade", "dependencia", "outro"]
 Period = Literal["7d", "30d", "90d", "12m", "all"]
+CalendarColor = Literal["azul", "verde", "amarelo", "laranja", "vermelho", "roxo", "cinza"]
+RecurrenceFreq = Literal["diaria", "semanal", "mensal", "anual"]
+Weekday = Annotated[int, Field(ge=0, le=6)]
 
 
 class Model(BaseModel):
@@ -182,6 +185,46 @@ class DigestTestIn(Model):
     channel: Literal["email", "telegram"]
 
 
+class RecurrenceIn(Model):
+    freq: RecurrenceFreq = Field(..., description="Diária, semanal, mensal (mesmo dia do mês) ou anual.")
+    interval: int = Field(1, ge=1, le=99, description="A cada N dias, semanas, meses ou anos.")
+    weekdays: list[Weekday] = Field([], description="Semanal: dias da semana (0 = segunda … 6 = domingo). Vazio = dia do início.")
+    until: date | None = Field(None, description="Último dia em que uma ocorrência pode começar (inclusive). null = sem fim.")
+
+
+class CalendarEntryCreate(Model):
+    id: str | None = Field(None, description="ID gerado no cliente (opcional; permite reenvio idempotente).")
+    title: str = Field(..., examples=["Reunião com o cliente"])
+    notes: str = Field("", description="Anotações livres.")
+    location: str = ""
+    all_day: bool = Field(False, description="Dia inteiro: datas inclusivas, sem horários.")
+    start_date: date
+    start_time: str | None = Field(None, examples=["14:00"], description="HH:MM (hora local, sem fuso). Ignorado no dia inteiro.")
+    end_date: date | None = Field(None, description="Padrão: a data de início.")
+    end_time: str | None = Field(None, examples=["15:00"])
+    color: CalendarColor = "azul"
+    private: bool = Field(False, description="Particular: para as outras contas, aparece só como Ocupado.")
+    recurrence: RecurrenceIn | None = None
+
+
+class CalendarEntryUpdate(Model):
+    title: str | None = None
+    notes: str | None = None
+    location: str | None = None
+    all_day: bool | None = None
+    start_date: date | None = None
+    start_time: str | None = None
+    end_date: date | None = None
+    end_time: str | None = None
+    color: CalendarColor | None = None
+    private: bool | None = None
+    recurrence: RecurrenceIn | None = Field(None, description="null remove a repetição.")
+
+
+class OccurrenceEdit(CalendarEntryUpdate):
+    id: str | None = Field(None, description="ID do novo evento avulso, gerado no cliente (opcional).")
+
+
 # ---------------------------------------------------------------------------
 # Saídas (documentação)
 # ---------------------------------------------------------------------------
@@ -302,6 +345,38 @@ class Top3Out(BaseModel):
     task_ids: list[str]
 
 
+class RecurrenceOut(BaseModel):
+    freq: RecurrenceFreq
+    interval: int
+    weekdays: list[int]
+    until: str | None
+
+
+class CalendarEntryOut(BaseModel):
+    id: str
+    account_id: str
+    title: str
+    notes: str
+    location: str
+    all_day: bool
+    start_date: str
+    start_time: str | None
+    end_date: str
+    end_time: str | None
+    color: CalendarColor
+    private: bool
+    redacted: bool = Field(..., description="Evento particular de outra conta: título, local e anotações ocultos.")
+    recurrence: RecurrenceOut | None
+    exceptions: list[str] = Field(..., description="Datas de ocorrências excluídas da série.")
+    created_at: str
+    updated_at: str
+
+
+class OccurrenceOut(BaseModel):
+    series: CalendarEntryOut
+    entry: CalendarEntryOut
+
+
 class BoardOut(BaseModel):
     seq: int
     account: AccountOut
@@ -313,6 +388,7 @@ class BoardOut(BaseModel):
     top3: Top3Out
     requesters: list[str]
     overload: dict
+    calendar: list[CalendarEntryOut]
 
 
 class ChangesOut(BaseModel):

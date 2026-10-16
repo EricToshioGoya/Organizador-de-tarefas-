@@ -1,7 +1,8 @@
 # Organizador de Tarefas
 
 Aplicação web para a equipe organizar tarefas em etapas, agrupadas em metas, com fases de
-desenvolvimento, dashboard de desempenho e acompanhamento pelo Gestor. Implementa a especificação
+desenvolvimento, calendário semanal com anotações, dashboard de desempenho e acompanhamento pelo Gestor.
+Implementa a especificação
 **v1.2 (23/09/2026)**: requisitos funcionais RF01–RF71, regras RN01–RN36 e não funcionais RNF01–RNF25.
 
 - **Back end:** Python 3.11+ · FastAPI · SQLite com *event sourcing* (cada alteração é um evento imutável).
@@ -65,8 +66,30 @@ confirma (RN26).
 **Resumo diário (RF56).** Cada pessoa ativa em *Configurações da conta* o horário, o e-mail e/ou o ID do chat
 do Telegram (RN29). O servidor verifica a cada 30 s e envia no horário de cada conta.
 
-**Calendário (RF55).** Cada conta tem um feed `.ics` (endereço em *Configurações da conta*). O Outlook assina
-feeds da rede interna; o Google Agenda só lê endereços públicos na internet.
+**Calendário (RF55).** Cada conta tem um feed `.ics` (endereço em *Configurações da conta*) com as datas de
+entrega e os eventos da aba Calendário (horários, repetições e ocorrências excluídas). Eventos particulares
+saem só como "Ocupado", porque o endereço não tem senha. O Outlook assina feeds da rede interna; o Google
+Agenda só lê endereços públicos na internet.
+
+## Calendário
+
+A aba **Calendário** mostra a semana em grade de horários, como no Outlook:
+
+- **Criar:** clique num horário (evento de 1 h) ou arraste para escolher o intervalo; clique na faixa
+  *Dia inteiro* para um evento sem horário; ou use **Novo evento**. No celular, toque no horário.
+- **Evento:** título, início e término (com horário ou dia inteiro, podendo atravessar a meia-noite), local,
+  cor, anotações e **Particular** (para as outras contas aparece só "Ocupado").
+- **Repetição:** diária, semanal (dias da semana), mensal ou anual, a cada N períodos, sem fim ou até uma data.
+- **Mover e redimensionar:** arraste o evento para outro dia ou horário e puxe a borda inferior para mudar o
+  término (com mouse ou caneta; `Esc` cancela). Arrastar uma ocorrência de série altera só aquela ocorrência.
+- **Séries:** abrir uma ocorrência edita só ela (ela vira um evento avulso); **Editar a série** altera todas.
+  Ao excluir, escolha entre só esta ocorrência, esta e as seguintes ou todas.
+- **Entregas e metas:** datas de entrega das tarefas e datas-alvo das metas aparecem na faixa *Dia inteiro*
+  (filtros **Entregas** e **Metas**); clicar abre a tarefa ou a meta. Entregas atrasadas ficam em vermelho.
+- **Equipe:** o calendário de cada conta aparece em *Equipe → perfil → Calendário*, em modo somente leitura.
+
+Como o resto do app, tudo é salvo na hora, funciona offline (fila local) e fica no histórico de eventos.
+API: `/api/accounts/{id}/calendar` e `/api/calendar/{id}` (detalhes em `/api/docs`).
 
 ## Testes (RNF15)
 
@@ -74,14 +97,14 @@ feeds da rede interna; o Google Agenda só lê endereços públicos na internet.
 .\run.ps1 -Test
 ```
 
-São 116 testes (pytest) cobrindo regras de negócio, métricas, previsões, integrações e fluxos completos da
-API. Cobertura: 95% no total e ~99% nos módulos de regras (`app/domain`) e métricas (`app/metrics`).
+São 130 testes (pytest) cobrindo regras de negócio, calendário, métricas, previsões, integrações e fluxos
+completos da API. Cobertura: 95% no total e ~99% nos módulos de regras (`app/domain`) e métricas (`app/metrics`).
 
 ## Arquitetura (RNF14, RNF22)
 
 ```
 app/
-  domain/        regras de negócio puras (RN01–RN36), criação rápida (RN19), datas
+  domain/        regras de negócio puras (RN01–RN36), criação rápida (RN19), datas, calendário (repetição)
   metrics/       KPIs, gráficos G1–G12, capacidade (RN25), Monte Carlo (RN28), similaridade (RN27), revisão semanal
   services/      comandos: validam regras, emitem eventos e aplicam regras derivadas; linha do tempo (RF48)
   store/         SQLite: eventos imutáveis + projeções de leitura reconstruíveis
@@ -136,6 +159,15 @@ Pontos em que a especificação admite mais de uma leitura. A regra adotada est�
     Alta ou Muito alta (padrão Média, inclusive para as tarefas já existentes). As pendentes são ordenadas só pela
     prioridade (Muito alta primeiro); no empate, a criada antes vem primeiro. A prioridade e a descrição aparecem
     no cartão e podem ser alteradas ali mesmo (menu da prioridade; clique na descrição para editar).
+14. **Calendário (aba nova, além da especificação v1.2).** Horários são locais e "flutuantes", sem fuso: um
+    evento das 14:00 aparece às 14:00 para todas as contas e no `.ics`. Mensal e anual repetem o dia do início;
+    meses sem esse dia (ex.: 31) e 29/02 fora de ano bissexto ficam sem ocorrência, como no Google Agenda. Na
+    repetição semanal, o evento começa no primeiro dia escolhido a partir da data de início (como no Outlook).
+    Alterar uma ocorrência a transforma em evento avulso; excluir a série não apaga as ocorrências já avulsas.
+    Eventos de 24 h ou mais vão para a faixa *Dia inteiro*. Só o dono cria e edita (o Gestor também só
+    visualiza); *Particular* esconde título, local e anotações das outras contas, mas **não** é controle de
+    acesso (RN11). Em conflito, vale a alteração mais recente de cada campo (RN30), com data e horário
+    tratados juntos.
 
 ## Dados de demonstração
 

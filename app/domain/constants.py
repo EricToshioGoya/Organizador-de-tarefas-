@@ -73,3 +73,14 @@ ACCOUNT_COLORS = (
 
 PERIODS = ("7d", "30d", "90d", "12m", "all")
 DEFAULT_PERIOD = "30d"
+
+# Calendário: cores dos eventos (categorias), repetição e limites
+CALENDAR_COLORS = ("azul", "verde", "amarelo", "laranja", "vermelho", "roxo", "cinza")
+DEFAULT_CALENDAR_COLOR = "azul"
+RECURRENCE_FREQS = ("diaria", "semanal", "mensal", "anual")
+RECURRENCE_MAX_INTERVAL = 99
+LOCATION_MAX = 200
+EVENT_MAX_SPAN_DAYS = 366
+# Evento particular visto por outra conta: só o horário, sem título, local nem anotações
+PRIVATE_EVENT_TITLE = "Ocupado"
+PRIVATE_EVENT_COLOR = "cinza"

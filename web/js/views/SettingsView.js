@@ -161,13 +161,13 @@ export function SettingsView() {
     <${Section}
       title="Calendário (.ics)"
       icon="calendar"
-      description="Assine no Google Agenda (Outras agendas → Do URL) ou no Outlook (Adicionar calendário → Da Internet). As datas de entrega aparecem como eventos de dia inteiro."
+      description="Assine no Google Agenda (Outras agendas → Do URL) ou no Outlook (Adicionar calendário → Da Internet). As datas de entrega aparecem como eventos de dia inteiro e os eventos da aba Calendário, com seus horários e repetições."
     >
       <div class="row">
         <input class="input mono" readOnly value=${calendarUrl} aria-label="Endereço do calendário" onFocus=${(e) => e.currentTarget.select()} />
         <${Button} icon="copy" onClick=${() => copy(calendarUrl)}>Copiar<//>
       </div>
-      <p class="xsmall faint">O Google Agenda só consegue ler endereços acessíveis pela internet; em rede interna, use o Outlook ou publique o servidor com HTTPS.</p>
+      <p class="xsmall faint">O Google Agenda só consegue ler endereços acessíveis pela internet; em rede interna, use o Outlook ou publique o servidor com HTTPS. Eventos particulares aparecem só como “Ocupado”, porque o endereço não tem senha.</p>
     <//>
 
     <${Section} title="Resumo diário" icon="mail" description="Atrasadas, vencimentos do dia e Top 3, no horário escolhido. E-mail e Telegram são opcionais.">

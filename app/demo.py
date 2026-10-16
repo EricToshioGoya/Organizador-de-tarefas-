@@ -1,4 +1,5 @@
-"""Gera uma equipe de demonstração com histórico realista (útil para testar o dashboard e o RNF09).
+"""Gera uma equipe de demonstração com histórico realista (útil para testar o dashboard e o RNF09),
+incluindo a agenda de cada conta na aba Calendário.
 
 Uso:
     python -m app.demo                      # cria dados se o banco estiver vazio
@@ -55,6 +56,85 @@ GOALS = [
     ("Reduzir atrasos no trimestre", 70),
     ("Certificação em segurança", 20),
 ]
+
+
+MEETINGS = [
+    ("Revisão com o cliente", "Teams", "laranja"),
+    ("Alinhamento com o time de dados", "Sala 2", "verde"),
+    ("Entrevista de candidato", "Sala 4", "roxo"),
+    ("Apresentação de resultados", "Auditório", "vermelho"),
+    ("Workshop de planejamento", "Sala 3", "amarelo"),
+    ("Café com o time", "Copa", "cinza"),
+]
+
+
+def _calendar(ctx, rng: random.Random, account, today, manager_name: str, is_manager: bool) -> None:
+    """Agenda da conta: reuniões que se repetem, compromissos das próximas semanas e um evento particular."""
+    monday = today - timedelta(days=today.weekday())
+    first = monday - timedelta(weeks=8)
+    weekly = commands.create_calendar_entry(
+        ctx,
+        account.id,
+        {
+            "title": "Reunião semanal da equipe",
+            "start_date": first.isoformat(),
+            "start_time": "09:30",
+            "end_time": "10:30",
+            "location": "Sala 3",
+            "notes": "Pauta: entregas da semana, bloqueios e prioridades.",
+            "recurrence": {"freq": "semanal", "weekdays": [0]},
+        },
+    )
+    commands.exclude_occurrence(ctx, weekly.id, (monday - timedelta(weeks=3)).isoformat())  # feriado
+    if not is_manager:
+        commands.create_calendar_entry(
+            ctx,
+            account.id,
+            {
+                "title": f"1:1 com {manager_name.split()[0]}",
+                "start_date": (first + timedelta(days=2)).isoformat(),
+                "start_time": "14:00",
+                "end_time": "14:30",
+                "color": "roxo",
+                "recurrence": {"freq": "semanal", "interval": 2},
+            },
+        )
+    for week in range(3):
+        for _ in range(rng.randint(2, 4)):
+            title, location, color = rng.choice(MEETINGS)
+            day = monday + timedelta(weeks=week, days=rng.randint(0, 4))
+            start = rng.choice([8, 10, 11, 13, 15, 16]) * 60 + rng.choice([0, 30])
+            length = rng.choice([30, 60, 60, 90])
+            commands.create_calendar_entry(
+                ctx,
+                account.id,
+                {
+                    "title": title,
+                    "start_date": day.isoformat(),
+                    "start_time": f"{start // 60:02d}:{start % 60:02d}",
+                    "end_time": f"{(start + length) // 60:02d}:{(start + length) % 60:02d}",
+                    "location": location,
+                    "color": color,
+                },
+            )
+    training = monday + timedelta(weeks=1, days=rng.randint(0, 3))
+    commands.create_calendar_entry(
+        ctx,
+        account.id,
+        {"title": "Treinamento de segurança", "all_day": True, "start_date": training.isoformat(), "end_date": (training + timedelta(days=1)).isoformat(), "color": "cinza"},
+    )
+    commands.create_calendar_entry(
+        ctx,
+        account.id,
+        {
+            "title": "Consulta médica",
+            "start_date": (monday + timedelta(days=rng.randint(0, 4))).isoformat(),
+            "start_time": "17:00",
+            "end_time": "18:00",
+            "private": True,
+            "notes": "Levar exames.",
+        },
+    )
 
 
 def _at(rng: random.Random, day: datetime, tz) -> datetime:
@@ -167,6 +247,10 @@ def seed(tasks_per_member: int = 200, seed_value: int = 42) -> dict:
                 pending = [t for t in repo.list_tasks(conn, account.id) if t.is_pending and not t.assigned_by]
                 if pending:
                     commands.add_comment(ctx(manager, now - timedelta(hours=5)), pending[0].id, "Como está o andamento? Precisa de ajuda?")
+            # calendário de cada conta (aba Calendário)
+            today = now.astimezone(tz).date()
+            for account in accounts:
+                _calendar(ctx(account, now - timedelta(days=60)), rng, account, today, manager.name, account.id == manager.id)
         return {"accounts": len(accounts), "tasks": total}
     finally:
         conn.close()

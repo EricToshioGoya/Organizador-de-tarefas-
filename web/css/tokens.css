@@ -67,6 +67,20 @@
   --seq-5: #256abf;
   --seq-6: #184f95;
 
+  /* Calendário — cores dos eventos (escolhidas pela pessoa): faixa lateral na cor, fundo com 16% dela e texto
+     com 40% dela sobre o grafite (contraste ≥ 5,6:1, também no hover) */
+  --ev-azul: #2a78d6;
+  --ev-verde: #16a34a;
+  --ev-amarelo: #eab308;
+  --ev-laranja: #ea580c;
+  --ev-vermelho: #dc2626;
+  --ev-roxo: #7c3aed;
+  --ev-cinza: #8a8a83;
+  --cal-line: #ebe7df;
+  --cal-line-soft: #f5f2ec;
+  --cal-today: #fbf8f1;
+  --cal-weekend: #fcfbf9;
+
   /* Status — significado reservado, sempre com ícone + texto */
   --good: #16a34a;
   --warning: #d97706;

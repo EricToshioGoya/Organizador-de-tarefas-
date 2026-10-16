@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import date
 from typing import Iterable
 
-from ..domain.models import Account, Goal, Step, Task
+from ..domain.models import Account, CalendarEntry, Goal, Step, Task
 from ..domain.timeutil import parse_date, parse_iso
 
 
@@ -326,6 +326,52 @@ def list_weekly_reviews(conn: sqlite3.Connection, account_id: str) -> list[dict]
         data["summary"] = _json(data["summary"], {})
         result.append(data)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Calendário
+# ---------------------------------------------------------------------------
+
+
+def calendar_entry_from_row(row: sqlite3.Row) -> CalendarEntry:
+    return CalendarEntry(
+        id=row["id"],
+        account_id=row["account_id"],
+        title=row["title"],
+        start_date=parse_date(row["start_date"]),  # type: ignore[arg-type]
+        end_date=parse_date(row["end_date"]),  # type: ignore[arg-type]
+        created_at=parse_iso(row["created_at"]),
+        updated_at=parse_iso(row["updated_at"]),
+        notes=row["notes"],
+        location=row["location"],
+        all_day=bool(row["all_day"]),
+        start_time=row["start_time"],
+        end_time=row["end_time"],
+        color=row["color"],
+        private=bool(row["private"]),
+        recurrence=_json(row["recurrence"], None),
+        exceptions=_json(row["exceptions"], []),
+    )
+
+
+def get_calendar_entry(conn: sqlite3.Connection, entry_id: str | None) -> CalendarEntry | None:
+    if not entry_id:
+        return None
+    row = conn.execute("SELECT * FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+    return calendar_entry_from_row(row) if row else None
+
+
+def list_calendar_entries(conn: sqlite3.Connection, account_id: str) -> list[CalendarEntry]:
+    rows = conn.execute(
+        "SELECT * FROM calendar_entries WHERE account_id = ? ORDER BY start_date, COALESCE(start_time, ''), created_at",
+        (account_id,),
+    ).fetchall()
+    return [calendar_entry_from_row(r) for r in rows]
+
+
+def calendar_field_ts(conn: sqlite3.Connection, entry_id: str) -> dict:
+    row = conn.execute("SELECT field_ts FROM calendar_entries WHERE id = ?", (entry_id,)).fetchone()
+    return _json(row["field_ts"], {}) if row else {}
 
 
 # ---------------------------------------------------------------------------
