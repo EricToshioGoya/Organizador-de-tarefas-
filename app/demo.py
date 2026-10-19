@@ -1,5 +1,5 @@
 """Gera uma equipe de demonstração com histórico realista (útil para testar o dashboard e o RNF09),
-incluindo a agenda de cada conta na aba Calendário e a Daily de ontem, hoje e amanhã.
+incluindo a agenda de cada conta na aba Calendário, a Daily de ontem, hoje e amanhã e duas listas na aba Listas.
 
 Uso:
     python -m app.demo                      # cria dados se o banco estiver vazio
@@ -164,6 +164,25 @@ def _daily(ctx, rng: random.Random, account, today, now: datetime) -> None:
             commands.update_daily_item(ctx(account, when + timedelta(hours=1)), item.id, {"done": True})
 
 
+SHOPPING = [("Café", 500, "g"), ("Arroz", 5, "kg"), ("Leite", 6, "L"), ("Pão de forma", 1, ""), ("Ovos", 12, "un"), ("Detergente", 2, "")]
+IDEAS = ["Automatizar o relatório semanal", "Testar o novo layout do painel", "Documentar o processo de deploy"]
+
+
+def _lists(ctx, account, now: datetime) -> None:
+    """Listas: uma lista de compras em ranking (com quantidades) e uma lista de tarefas."""
+    when = now - timedelta(days=2)
+    shopping = commands.create_user_list(ctx(account, when), account.id, {"name": "Lista de compras", "kind": "ranking"})
+    for index, (title, quantity, unit) in enumerate(SHOPPING):
+        item = commands.create_list_item(ctx(account, when + timedelta(minutes=index)), shopping.id, {"title": title, "quantity": quantity, "unit": unit})
+        if title == "Ovos":
+            commands.update_list_item(ctx(account, now - timedelta(hours=3)), item.id, {"done": True})
+    ideas = commands.create_user_list(ctx(account, when + timedelta(hours=1)), account.id, {"name": "Ideias", "kind": "tarefas"})
+    for index, title in enumerate(IDEAS):
+        item = commands.create_list_item(ctx(account, when + timedelta(hours=1, minutes=index)), ideas.id, {"title": title})
+        if index == 0:
+            commands.update_list_item(ctx(account, now - timedelta(hours=1)), item.id, {"done": True})
+
+
 def _at(rng: random.Random, day: datetime, tz) -> datetime:
     local = datetime.combine(day.date(), time(rng.randint(8, 18), rng.randint(0, 59)), tz)
     return local.astimezone(utcnow().tzinfo)
@@ -279,6 +298,7 @@ def seed(tasks_per_member: int = 200, seed_value: int = 42) -> dict:
             for account in accounts:
                 _calendar(ctx(account, now - timedelta(days=60)), rng, account, today, manager.name, account.id == manager.id)
                 _daily(ctx, rng, account, today, now)
+                _lists(ctx, account, now)
         return {"accounts": len(accounts), "tasks": total}
     finally:
         conn.close()

@@ -22,6 +22,8 @@ TEMPLATE_FIELDS = {"name", "title", "description", "difficulty", "steps"}
 CALENDAR_SCHEDULE_FIELDS = {"all_day", "start_date", "start_time", "end_date", "end_time"}
 CALENDAR_FIELDS = {"title", "notes", "location", "color", "private", "recurrence", *CALENDAR_SCHEDULE_FIELDS}
 DAILY_FIELDS = {"title", "note", "day"}
+LIST_FIELDS = {"name", "kind"}
+LIST_ITEM_FIELDS = {"title", "note", "quantity", "unit"}
 
 
 def handles(*types: str) -> Callable[[Handler], Handler]:
@@ -130,11 +132,11 @@ def _settings_changed(conn, ev, p):
 
 @handles("ContaExcluida")
 def _account_deleted(conn, ev, p):
-    """RN13: a exclusão da conta leva junto tarefas, metas, templates, o calendário e a Daily."""
+    """RN13: a exclusão da conta leva junto tarefas, metas, templates, o calendário, a Daily e as listas."""
     account_id = ev["aggregate_id"]
     task_ids = [r["id"] for r in conn.execute("SELECT id FROM tasks WHERE account_id = ?", (account_id,))]
     _delete_task_rows(conn, task_ids)
-    for table in ("goals", "templates", "top3", "weekly_reviews", "comment_reads", "calendar_entries", "daily_items"):
+    for table in ("goals", "templates", "top3", "weekly_reviews", "comment_reads", "calendar_entries", "daily_items", "lists", "list_items"):
         conn.execute(f"DELETE FROM {table} WHERE account_id = ?", (account_id,))
     conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
 
@@ -629,3 +631,97 @@ def _daily_done(conn, ev, p):
 @handles("ItemDailyExcluido")
 def _daily_deleted(conn, ev, p):
     conn.execute("DELETE FROM daily_items WHERE id = ?", (ev["aggregate_id"],))
+
+
+# ---------------------------------------------------------------------------
+# Listas
+# ---------------------------------------------------------------------------
+
+
+@handles("ListaCriada")
+def _list_created(conn, ev, p):
+    ts = ev["occurred_at"]
+    conn.execute(
+        "INSERT INTO lists(id, account_id, name, kind, created_at, updated_at, field_ts, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (ev["aggregate_id"], ev["account_id"], p["name"], p["kind"], ts, ts, dumps({"name": ts, "kind": ts, "order": ts}), ev["seq"]),
+    )
+
+
+@handles("ListaEditada")
+def _list_edited(conn, ev, p):
+    changes = {k: v for k, v in (p.get("changes") or {}).items() if k in LIST_FIELDS}
+    for field, change in changes.items():
+        conn.execute(f"UPDATE lists SET {field} = ? WHERE id = ?", (change.get("new"), ev["aggregate_id"]))
+    _touch_list(conn, ev)
+    _merge_field_ts(conn, "lists", ev["aggregate_id"], changes.keys(), ev["occurred_at"])
+
+
+@handles("ItensListaReordenados")
+def _list_reordered(conn, ev, p):
+    for index, item_id in enumerate(p.get("order") or []):
+        conn.execute("UPDATE list_items SET position = ? WHERE id = ? AND list_id = ?", (index, item_id, ev["aggregate_id"]))
+    _touch_list(conn, ev)
+    _merge_field_ts(conn, "lists", ev["aggregate_id"], ["order"], ev["occurred_at"])
+
+
+@handles("ListaExcluida")
+def _list_deleted(conn, ev, p):
+    conn.execute("DELETE FROM list_items WHERE list_id = ?", (ev["aggregate_id"],))
+    conn.execute("DELETE FROM lists WHERE id = ?", (ev["aggregate_id"],))
+
+
+def _touch_list(conn: sqlite3.Connection, event: dict) -> None:
+    conn.execute(
+        "UPDATE lists SET updated_at = MAX(updated_at, ?), version = ? WHERE id = ?",
+        (event["occurred_at"], event["seq"], event["aggregate_id"]),
+    )
+
+
+@handles("ItemListaCriado")
+def _list_item_created(conn, ev, p):
+    ts = ev["occurred_at"]
+    conn.execute(
+        "INSERT INTO list_items(id, list_id, account_id, title, note, quantity, unit, position, done, done_at, created_at, updated_at, field_ts, version) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?, ?, ?)",
+        (
+            ev["aggregate_id"],
+            p["list_id"],
+            ev["account_id"],
+            p["title"],
+            p.get("note", ""),
+            p.get("quantity"),
+            p.get("unit", ""),
+            p.get("position", 0),
+            ts,
+            ts,
+            dumps({name: ts for name in ("title", "note", "quantity", "unit", "done")}),
+            ev["seq"],
+        ),
+    )
+
+
+@handles("ItemListaEditado")
+def _list_item_edited(conn, ev, p):
+    changes = {k: v for k, v in (p.get("changes") or {}).items() if k in LIST_ITEM_FIELDS}
+    for field, change in changes.items():
+        conn.execute(f"UPDATE list_items SET {field} = ? WHERE id = ?", (change.get("new"), ev["aggregate_id"]))
+    conn.execute(
+        "UPDATE list_items SET updated_at = MAX(updated_at, ?), version = ? WHERE id = ?",
+        (ev["occurred_at"], ev["seq"], ev["aggregate_id"]),
+    )
+    _merge_field_ts(conn, "list_items", ev["aggregate_id"], changes.keys(), ev["occurred_at"])
+
+
+@handles("ItemListaConcluido", "ItemListaReaberto")
+def _list_item_done(conn, ev, p):
+    done = ev["type"] == "ItemListaConcluido"
+    conn.execute(
+        "UPDATE list_items SET done = ?, done_at = ?, updated_at = MAX(updated_at, ?), version = ? WHERE id = ?",
+        (1 if done else 0, ev["occurred_at"] if done else None, ev["occurred_at"], ev["seq"], ev["aggregate_id"]),
+    )
+    _merge_field_ts(conn, "list_items", ev["aggregate_id"], ["done"], ev["occurred_at"])
+
+
+@handles("ItemListaExcluido")
+def _list_item_deleted(conn, ev, p):
+    conn.execute("DELETE FROM list_items WHERE id = ?", (ev["aggregate_id"],))

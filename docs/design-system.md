@@ -68,7 +68,7 @@ de valor, contorno sutil e a tabela equivalente.
 
 A cor do evento é decorativa: o título está sempre escrito, e repetição e "Particular" têm ícone próprio.
 Eventos lado a lado em colunas estreitas cortam cada linha com reticências (container query) em vez de quebrar
-palavras. Com sete abas, o cabeçalho tira os ícones das abas abaixo de 1520 px e, abaixo de 1360 px, também o
+palavras. Com oito abas, o cabeçalho tira os ícones das abas abaixo de 1640 px e, abaixo de 1460 px, também o
 nome da marca e os textos dos botões. Na barra inferior do celular, rótulos longos são cortados com reticências.
 
 ## Daily
@@ -76,6 +76,14 @@ nome da marca e os textos dos botões. Na barra inferior do celular, rótulos lo
 Lista em um bloco branco, com linhas separadas por fio e círculo de conclusão (como no To Do). Pendências de dias
 anteriores levam o selo âmbar de status "atenção" (`status-warning`) com o dia de origem; concluídas ficam
 riscadas em `--text-3`. O item aberto e seus detalhes usam `--surface-sunken`.
+
+## Listas
+
+Reaproveita as linhas da Daily. As listas ficam numa coluna creme (ferramenta) à esquerda; a aberta fica em branco
+com sombra. Abaixo de 900 px, a coluna vira uma faixa rolável acima da lista. No ranking, a posição (1º, 2º…) usa
+algarismos tabulares em `--text-2` e a quantidade fica num controle − valor + em pílula; abaixo de 560 px, os
+botões somem e a quantidade é editada nos detalhes do item. O modelo da lista aparece em selo neutro com ícone
+próprio (caixa marcada para Tarefas, lista numerada para Ranking).
 
 Texto: `#1d1d1b`, `#4f4f49` e `#62625b` — sobre o branco 16,9 · 8,2 · 6,1:1 e sobre o fundo cinza
 13,4 · 6,6 · 4,9:1, todos WCAG AA (RNF12).

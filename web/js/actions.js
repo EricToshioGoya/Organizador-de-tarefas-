@@ -6,7 +6,7 @@ import { enqueue, onDrain, onMutationError, onSyncChange, pendingFor, hasPending
 import { normalizeTask, recomputeGoals, isDone, orderedSteps } from "./lib/rules.js";
 import { normalizeEntry } from "./lib/calendar.js";
 import { getState, setState } from "./lib/store.js";
-import { addDays, diffDays, todayISO } from "./lib/format.js";
+import { addDays, diffDays, plural, todayISO } from "./lib/format.js";
 
 const POLL_MS = 10_000; // RNF19: alterações de outras contas visíveis em até 30 s
 let lastSeq = 0;
@@ -64,6 +64,7 @@ export function parseHash(hash = location.hash) {
   switch (name) {
     case "hoje":
     case "daily":
+    case "listas":
     case "tarefas":
     case "calendario":
     case "metas":
@@ -304,7 +305,7 @@ function me() {
 function mutate({ method, path, body, accountId, taskId, itemId, apply, onResult, success }) {
   apply?.(); // a interface responde na hora (RNF09: ≤ 100 ms); o servidor confirma em seguida
   const promise = enqueue({ method, path, body, account: me(), meta: { accountId, taskId, itemId } });
-  // itemId identifica eventos do calendário e itens da Daily
+  // itemId identifica eventos do calendário, itens da Daily, listas e itens de listas
   const sameItem = (meta) => (taskId ? meta.taskId === taskId : itemId ? meta.itemId === itemId : meta.accountId === accountId);
   return promise.then(
     (result) => {
@@ -857,6 +858,158 @@ export function deleteDailyItem(accountId, itemId) {
     });
   }
   return promise;
+}
+
+// Listas: listas com nome, no modelo tarefas (como a Daily) ou ranking (posição reordenável e quantidade)
+
+function updateLists(accountId, fn) {
+  updateBoard(accountId, (board) => ({ ...board, lists: fn(board.lists || []) }));
+}
+
+function updateListItems(accountId, fn) {
+  updateBoard(accountId, (board) => ({ ...board, list_items: fn(board.list_items || []) }));
+}
+
+const upsert = (rows, row) => (rows.some((r) => r.id === row.id) ? rows.map((r) => (r.id === row.id ? row : r)) : [...rows, row]);
+
+/** Cria a lista e devolve o ID na hora, para abri-la. */
+export function createList(accountId, data) {
+  const id = uid();
+  const now = new Date().toISOString();
+  mutate({
+    method: "POST",
+    path: `/api/accounts/${accountId}/lists`,
+    body: { id, ...data },
+    accountId,
+    itemId: id,
+    apply: () => updateLists(accountId, (lists) => [...lists, { id, account_id: accountId, ...data, created_at: now, updated_at: now }]),
+    onResult: (list) => updateLists(accountId, (lists) => upsert(lists, list)),
+  });
+  return id;
+}
+
+/** Nome e modelo (tarefas ou ranking). */
+export function updateList(accountId, listId, changes) {
+  return mutate({
+    method: "PATCH",
+    path: `/api/lists/${listId}`,
+    body: changes,
+    accountId,
+    itemId: listId,
+    apply: () => updateLists(accountId, (lists) => lists.map((l) => (l.id === listId ? { ...l, ...changes, updated_at: new Date().toISOString() } : l))),
+    onResult: (list) => updateLists(accountId, (lists) => upsert(lists, list)),
+  });
+}
+
+/** Exclui a lista com todos os itens, depois de confirmar. Resolve true se excluiu. */
+export async function deleteList(accountId, listId) {
+  const board = getState().boards[accountId];
+  const list = (board?.lists || []).find((l) => l.id === listId);
+  if (!list) return false;
+  const count = (board.list_items || []).filter((i) => i.list_id === listId).length;
+  const ok = await confirmDialog({
+    title: "Excluir lista?",
+    text: count
+      ? `A lista “${list.name}” e ${plural(count, "item", "itens")} serão excluídos. Esta ação não pode ser desfeita.`
+      : `A lista “${list.name}” será excluída. Esta ação não pode ser desfeita.`,
+    confirmLabel: "Excluir lista",
+    danger: true,
+  });
+  if (!ok) return false;
+  mutate({
+    method: "DELETE",
+    path: `/api/lists/${listId}`,
+    accountId,
+    itemId: listId,
+    apply: () =>
+      updateBoard(accountId, (b) => ({
+        ...b,
+        lists: (b.lists || []).filter((l) => l.id !== listId),
+        list_items: (b.list_items || []).filter((i) => i.list_id !== listId),
+      })),
+    success: `Lista “${list.name}” excluída.`,
+  });
+  return true;
+}
+
+/** Sem posição, o item entra no fim do ranking (como no servidor). */
+export function createListItem(accountId, listId, data, { id = uid() } = {}) {
+  const now = new Date().toISOString();
+  const siblings = (getState().boards[accountId]?.list_items || []).filter((i) => i.list_id === listId);
+  const position = data.position ?? Math.max(-1, ...siblings.map((i) => i.position)) + 1;
+  const optimistic = { id, list_id: listId, account_id: accountId, note: "", quantity: null, unit: "", ...data, position, done: false, done_at: null, created_at: now, updated_at: now };
+  return mutate({
+    method: "POST",
+    path: `/api/lists/${listId}/items`,
+    body: { id, ...data },
+    accountId,
+    itemId: id,
+    apply: () => updateListItems(accountId, (items) => [...items.filter((i) => i.id !== id), optimistic]),
+    onResult: (item) => updateListItems(accountId, (items) => upsert(items, item)),
+  }).then(() => id);
+}
+
+/** Título, anotação, quantidade, unidade e conclusão. */
+export function updateListItem(accountId, itemId, changes) {
+  return mutate({
+    method: "PATCH",
+    path: `/api/list-items/${itemId}`,
+    body: changes,
+    accountId,
+    itemId,
+    apply: () =>
+      updateListItems(accountId, (items) =>
+        items.map((i) => {
+          if (i.id !== itemId) return i;
+          const now = new Date().toISOString();
+          const next = { ...i, ...changes, updated_at: now };
+          if ("done" in changes && changes.done !== i.done) next.done_at = changes.done ? now : null;
+          return next;
+        }),
+      ),
+    onResult: (item) => updateListItems(accountId, (items) => upsert(items, item)),
+  });
+}
+
+/** Exclui na hora, com "Desfazer": o item volta com o mesmo ID, posição, quantidade e conclusão. */
+export function deleteListItem(accountId, itemId) {
+  const item = (getState().boards[accountId]?.list_items || []).find((i) => i.id === itemId);
+  const promise = mutate({
+    method: "DELETE",
+    path: `/api/list-items/${itemId}`,
+    accountId,
+    itemId,
+    apply: () => updateListItems(accountId, (items) => items.filter((i) => i.id !== itemId)),
+  });
+  if (item) {
+    toast(`“${item.title}” excluído.`, "success", {
+      duration: 6000,
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          const { title, note, quantity, unit, position } = item;
+          createListItem(accountId, item.list_id, { title, note, quantity, unit, position }, { id: item.id });
+          if (item.done) updateListItem(accountId, item.id, { done: true });
+        },
+      },
+    });
+  }
+  return promise;
+}
+
+/** Ranking: `order` traz os IDs na nova ordem; a resposta do servidor só atualiza as posições. */
+export function reorderListItems(accountId, listId, order) {
+  const setPositions = (positions) =>
+    updateListItems(accountId, (items) => items.map((i) => (positions.has(i.id) ? { ...i, position: positions.get(i.id) } : i)));
+  return mutate({
+    method: "PUT",
+    path: `/api/lists/${listId}/order`,
+    body: { order },
+    accountId,
+    itemId: listId,
+    apply: () => setPositions(new Map(order.map((id, index) => [id, index]))),
+    onResult: (items) => setPositions(new Map(items.map((i) => [i.id, i.position]))),
+  });
 }
 
 // Comentários (RF66–RF68)

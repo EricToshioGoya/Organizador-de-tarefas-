@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 # Eventos (fonte da verdade) + projeções (modelos de leitura reconstruíveis a partir dos eventos).
 SCHEMA = """
@@ -209,6 +209,38 @@ CREATE TABLE IF NOT EXISTS daily_items (
 );
 CREATE INDEX IF NOT EXISTS ix_daily_account ON daily_items(account_id, day);
 
+-- Listas: listas com nome (modelo tarefas ou ranking) e seus itens, visíveis só para a própria conta.
+CREATE TABLE IF NOT EXISTS lists (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    kind TEXT NOT NULL DEFAULT 'tarefas',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    field_ts TEXT NOT NULL DEFAULT '{}',
+    version INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS ix_lists_account ON lists(account_id, created_at);
+
+CREATE TABLE IF NOT EXISTS list_items (
+    id TEXT PRIMARY KEY,
+    list_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    quantity REAL,
+    unit TEXT NOT NULL DEFAULT '',
+    position INTEGER NOT NULL DEFAULT 0,
+    done INTEGER NOT NULL DEFAULT 0,
+    done_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    field_ts TEXT NOT NULL DEFAULT '{}',
+    version INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS ix_list_items_list ON list_items(list_id, position);
+CREATE INDEX IF NOT EXISTS ix_list_items_account ON list_items(account_id);
+
 -- Operacional (não é estado de domínio): controle de envio do resumo diário (RF56).
 CREATE TABLE IF NOT EXISTS digest_log (
     account_id TEXT NOT NULL,
@@ -234,6 +266,8 @@ PROJECTION_TABLES = (
     "weekly_reviews",
     "calendar_entries",
     "daily_items",
+    "lists",
+    "list_items",
 )
 
 WRITE_LOCK = threading.RLock()

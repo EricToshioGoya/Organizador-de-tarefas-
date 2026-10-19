@@ -42,6 +42,7 @@ export function AutoText({
   rows,
   inputClass,
   ariaLabel,
+  list,
 }) {
   const [local, setLocal] = useState(value);
   const [error, setError] = useState(null);
@@ -116,6 +117,7 @@ export function AutoText({
         ...${common}
         type="text"
         class=${cx("input", inputClass)}
+        list=${list}
         onKeyDown=${(event) => {
           if (event.key === "Enter") {
             event.preventDefault();

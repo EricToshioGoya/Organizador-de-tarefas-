@@ -84,3 +84,11 @@ EVENT_MAX_SPAN_DAYS = 366
 # Evento particular visto por outra conta: só o horário, sem título, local nem anotações
 PRIVATE_EVENT_TITLE = "Ocupado"
 PRIVATE_EVENT_COLOR = "cinza"
+
+# Listas: modelo "tarefas" (como a Daily) ou "ranking" (posição reordenável e quantidade com unidade)
+LIST_KINDS = ("tarefas", "ranking")
+DEFAULT_LIST_KIND = "tarefas"
+LISTS_MAX = 100
+LIST_ITEMS_MAX = 500
+UNIT_MAX = 20
+QUANTITY_MAX = 1_000_000

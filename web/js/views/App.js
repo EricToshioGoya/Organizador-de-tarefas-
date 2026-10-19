@@ -1,4 +1,4 @@
-// Estrutura do app: cabeçalho com abas (incluindo Daily e Calendário), indicador de salvamento (RF69), menu da conta (RF26),
+// Estrutura do app: cabeçalho com abas (incluindo Daily, Listas e Calendário), indicador de salvamento (RF69), menu da conta (RF26),
 // criação de tarefa em 1 clique de qualquer tela (RNF10), gaveta de detalhes e painel de drill-down.
 import { html, cx } from "../lib/html.js";
 import { useEffect } from "preact/hooks";
@@ -11,6 +11,7 @@ import { TodayView } from "./TodayView.js";
 import { TasksView } from "./TasksView.js";
 import { CalendarView } from "./CalendarView.js";
 import { DailyView } from "./DailyView.js";
+import { ListsView } from "./ListsView.js";
 import { GoalsView, GoalDetailView } from "./GoalsView.js";
 import { PerformanceView } from "./PerformanceView.js";
 import { TeamView, MemberProfileView } from "./TeamView.js";
@@ -25,6 +26,7 @@ import { navigate, openModal, switchAccount } from "../actions.js";
 const MEMBER_TABS = [
   { key: "hoje", label: "Hoje", icon: "sun" },
   { key: "daily", label: "Daily", icon: "checkSquare" },
+  { key: "listas", label: "Listas", icon: "clipboardList" },
   { key: "tarefas", label: "Tarefas", icon: "list" },
   { key: "calendario", label: "Calendário", icon: "calendar" },
   { key: "metas", label: "Metas", icon: "target" },
@@ -35,6 +37,7 @@ const MANAGER_TABS = [
   { key: "equipe", label: "Painel", icon: "dashboard" },
   { key: "hoje", label: "Hoje", icon: "sun" },
   { key: "daily", label: "Daily", icon: "checkSquare" },
+  { key: "listas", label: "Listas", icon: "clipboardList" },
   { key: "tarefas", label: "Tarefas", icon: "list" },
   { key: "calendario", label: "Calendário", icon: "calendar" },
   { key: "metas", label: "Metas", icon: "target" },
@@ -141,6 +144,8 @@ function Page({ route }) {
       return html`<${TodayView} />`;
     case "daily":
       return html`<${DailyView} />`;
+    case "listas":
+      return html`<${ListsView} />`;
     case "tarefas":
       return html`<${TasksView} />`;
     case "calendario":

@@ -1,4 +1,4 @@
-// Modais globais: confirmação, revisão semanal (RF51), nova tarefa e nova meta.
+// Modais globais: confirmação, revisão semanal (RF51), nova tarefa, nova meta e nova lista.
 import { html, cx } from "../lib/html.js";
 import { useStore } from "../lib/store.js";
 import { Icon } from "../ui/icons.js";
@@ -8,6 +8,7 @@ import { fmtDate, fmtNumber } from "../lib/format.js";
 import { markReviewSeen } from "../actions.js";
 import { TaskFormModal } from "./TaskForm.js";
 import { GoalFormModal } from "./GoalsView.js";
+import { ListFormModal } from "./ListsView.js";
 
 export function ConfirmModal({ title, text, confirmLabel, danger, onResult }) {
   return html`<${Modal}
@@ -82,6 +83,8 @@ export function ModalHost() {
       return html`<${TaskFormModal} key=${key} ...${props} />`;
     case "newGoal":
       return html`<${GoalFormModal} key=${key} ...${props} />`;
+    case "listForm":
+      return html`<${ListFormModal} key=${key} ...${props} />`;
     case "weeklyReview":
       return html`<${WeeklyReviewModal} key=${key} ...${props} />`;
     default:

@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 from ..domain import rules
 from ..domain.constants import PRIVATE_EVENT_COLOR, PRIVATE_EVENT_TITLE
-from ..domain.models import Account, CalendarEntry, DailyItem, Goal, Task
+from ..domain.models import Account, CalendarEntry, DailyItem, Goal, ListItem, Task, UserList
 from ..domain.timeutil import date_iso, local_date, to_iso
 from ..metrics import capacity
 from ..metrics.common import first_activity_day
@@ -164,6 +164,42 @@ def daily_item_json(item: DailyItem) -> dict:
     }
 
 
+def user_list_json(user_list: UserList) -> dict:
+    return {
+        "id": user_list.id,
+        "account_id": user_list.account_id,
+        "name": user_list.name,
+        "kind": user_list.kind,
+        "created_at": to_iso(user_list.created_at),
+        "updated_at": to_iso(user_list.updated_at),
+    }
+
+
+def list_item_json(item: ListItem) -> dict:
+    quantity = item.quantity
+    return {
+        "id": item.id,
+        "list_id": item.list_id,
+        "account_id": item.account_id,
+        "title": item.title,
+        "note": item.note,
+        "quantity": int(quantity) if quantity is not None and float(quantity).is_integer() else quantity,
+        "unit": item.unit,
+        "position": item.position,
+        "done": item.done,
+        "done_at": to_iso(item.done_at),
+        "created_at": to_iso(item.created_at),
+        "updated_at": to_iso(item.updated_at),
+    }
+
+
+def lists_json(conn: sqlite3.Connection, account_id: str) -> dict:
+    return {
+        "lists": [user_list_json(lst) for lst in repo.list_user_lists(conn, account_id)],
+        "items": [list_item_json(i) for i in repo.list_items_of_account(conn, account_id)],
+    }
+
+
 def task_payload(conn: sqlite3.Connection, task: Task, viewer: Account | None) -> dict:
     attachments = repo.attachments_by_task(conn, [task.id]).get(task.id, [])
     comments = None
@@ -203,4 +239,7 @@ def board_json(conn: sqlite3.Connection, account: Account, viewer: Account | Non
         "overload": capacity.overload(tasks, today, tz, first_activity_day(tasks, tz)),
         "calendar": [calendar_entry_json(e, viewer) for e in repo.list_calendar_entries(conn, account.id)],
         "daily": [daily_item_json(i) for i in repo.list_daily_items(conn, account.id)],
+        # Listas são privadas: só entram no quadro da própria conta
+        "lists": [user_list_json(lst) for lst in repo.list_user_lists(conn, account.id)] if own else [],
+        "list_items": [list_item_json(i) for i in repo.list_items_of_account(conn, account.id)] if own else [],
     }

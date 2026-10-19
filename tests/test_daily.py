@@ -145,7 +145,7 @@ def test_existing_database_gets_daily_table(settings_env):
     conn = sqlite3.connect(path)
     start = db.SCHEMA.index("-- Daily")
     end = db.SCHEMA.index("-- Operacional")
-    conn.executescript(db.SCHEMA[:start] + db.SCHEMA[end:])  # esquema v3, com o calendário e sem a Daily
+    conn.executescript(db.SCHEMA[:start] + db.SCHEMA[end:])  # esquema v3, com o calendário e sem a Daily (nem as listas)
     conn.close()
 
     db.init_db(path)
@@ -153,6 +153,6 @@ def test_existing_database_gets_daily_table(settings_env):
     try:
         assert conn.execute("SELECT COUNT(*) FROM daily_items").fetchone()[0] == 0
         assert conn.execute("SELECT COUNT(*) FROM calendar_entries").fetchone()[0] == 0
-        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()["value"] == "4"
+        assert conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()["value"] == str(db.SCHEMA_VERSION)
     finally:
         conn.close()
