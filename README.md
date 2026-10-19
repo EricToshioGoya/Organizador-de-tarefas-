@@ -1,8 +1,8 @@
 # Organizador de Tarefas
 
 Aplicação web para a equipe organizar tarefas em etapas, agrupadas em metas, com fases de
-desenvolvimento, Daily (tarefas simples do dia), calendário semanal com anotações, dashboard de desempenho e
-acompanhamento pelo Gestor.
+desenvolvimento, Daily (tarefas simples do dia), Listas (listas com nome, como a de compras), calendário semanal
+com anotações, dashboard de desempenho e acompanhamento pelo Gestor.
 Implementa a especificação
 **v1.2 (23/09/2026)**: requisitos funcionais RF01–RF71, regras RN01–RN36 e não funcionais RNF01–RNF25.
 
@@ -108,13 +108,30 @@ A aba **Daily** é a lista de tarefas simples do dia, como o *Meu Dia* do Micros
 
 API: `/api/accounts/{id}/daily` e `/api/daily/{id}`.
 
+## Listas
+
+A aba **Listas** guarda listas com nome (ex.: *Lista de compras*, *Ideias*), cada uma em um modelo:
+
+- **Tarefas:** funciona como a Daily, sem dias: adicione no campo do topo, marque o círculo para concluir e clique
+  no item para editar o título e escrever uma anotação. A mais recente fica no topo.
+- **Ranking:** os itens ficam numerados (1º, 2º, 3º…) na ordem de prioridade. Arraste pela alça ⠿ (ou use as
+  setas ↑ ↓ com a alça em foco) para reordenar. Cada item pode ter **quantidade** e **unidade** (ex.: 2 kg,
+  1,5 L, 12 un), informadas ao adicionar ou nos detalhes; os botões − e + ajustam a quantidade. Também dá para
+  concluir (ex.: "comprado").
+- **Várias listas:** **Nova lista** pede o nome e o modelo. No menu ⋯ da lista: renomear, trocar o modelo
+  (os itens continuam) e excluir a lista com os itens (pede confirmação).
+- **Excluir item:** a lixeira exclui na hora, com **Desfazer** no aviso (o item volta na mesma posição).
+- **Privacidade:** as listas são só suas: colegas e Gestor não as veem, nem no perfil da Equipe.
+
+API: `/api/accounts/{id}/lists`, `/api/lists/{id}` (com `/items` e `/order`) e `/api/list-items/{id}`.
+
 ## Testes (RNF15)
 
 ```powershell
 .\run.ps1 -Test
 ```
 
-São 137 testes (pytest) cobrindo regras de negócio, Daily, calendário, métricas, previsões, integrações e fluxos
+São 144 testes (pytest) cobrindo regras de negócio, Daily, Listas, calendário, métricas, previsões, integrações e fluxos
 completos da API. Cobertura: 95% no total e ~99% nos módulos de regras (`app/domain`) e métricas (`app/metrics`).
 
 ## Arquitetura (RNF14, RNF22)
@@ -190,6 +207,12 @@ Pontos em que a especificação admite mais de uma leitura. A regra adotada est�
     de Hoje; concluída hoje, entra nas concluídas de hoje. Sem data, um item novo vai para o dia em que a ação
     ocorreu (fuso do navegador). Só o dono cria e edita. Em conflito, vale a alteração mais recente de cada
     campo (título, anotação, dia e conclusão — RN30).
+16. **Listas (aba nova, além da especificação v1.2).** Também separadas das tarefas e sem métricas. Diferente da
+    Daily, são **privadas**: só a própria conta lê e edita (nem o Gestor as vê). O modelo é da lista, não do
+    item; trocar o modelo não apaga posição nem quantidade. No ranking, um item novo entra no fim e os
+    concluídos saem da numeração (voltam à posição ao reabrir). Quantidade é opcional, maior que zero, com até
+    três casas decimais; a unidade é texto livre (até 20 caracteres). Em conflito, vale a alteração mais
+    recente de cada campo (nome, modelo, ordem, título, anotação, quantidade, unidade e conclusão — RN30).
 
 ## Dados de demonstração
 
@@ -199,4 +222,4 @@ Pontos em que a especificação admite mais de uma leitura. A regra adotada est�
 
 Cria, num banco separado (`%LOCALAPPDATA%\OrganizadorDeTarefas\demo`), cinco contas (Ana Souza é a Gestora)
 e 250 tarefas por membro com histórico de seis meses: etapas, adiamentos com motivo, fases, metas,
-atribuições e comentários.
+atribuições e comentários, além de duas listas por conta (*Lista de compras* em ranking e *Ideias*).

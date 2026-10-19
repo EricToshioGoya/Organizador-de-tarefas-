@@ -15,6 +15,7 @@ PostponeReason = Literal["subestimei", "prioridade", "dependencia", "outro"]
 Period = Literal["7d", "30d", "90d", "12m", "all"]
 CalendarColor = Literal["azul", "verde", "amarelo", "laranja", "vermelho", "roxo", "cinza"]
 RecurrenceFreq = Literal["diaria", "semanal", "mensal", "anual"]
+ListKind = Literal["tarefas", "ranking"]
 Weekday = Annotated[int, Field(ge=0, le=6)]
 
 
@@ -239,6 +240,38 @@ class DailyItemUpdate(Model):
     done: bool | None = Field(None, description="Concluir (true) ou reabrir (false).")
 
 
+class UserListCreate(Model):
+    id: str | None = Field(None, description="ID gerado no cliente (opcional; permite reenvio idempotente).")
+    name: str = Field(..., examples=["Lista de compras"])
+    kind: ListKind = Field("tarefas", description="Modelo: tarefas (como a Daily) ou ranking (posição e quantidade).")
+
+
+class UserListUpdate(Model):
+    name: str | None = None
+    kind: ListKind | None = None
+
+
+class ListItemsOrder(Model):
+    order: list[str] = Field(..., description="IDs dos itens na nova ordem do ranking (os omitidos seguem depois).")
+
+
+class ListItemCreate(Model):
+    id: str | None = Field(None, description="ID gerado no cliente (opcional; permite reenvio idempotente).")
+    title: str = Field(..., examples=["Arroz"])
+    note: str = Field("", description="Anotação livre.")
+    quantity: float | None = Field(None, description="Quantidade (maior que zero).", examples=[2])
+    unit: str = Field("", description="Unidade da quantidade.", examples=["kg"])
+    position: int | None = Field(None, ge=0, description="Posição no ranking. Padrão: no fim.")
+
+
+class ListItemUpdate(Model):
+    title: str | None = None
+    note: str | None = None
+    quantity: float | None = Field(None, description="Nova quantidade; null remove.")
+    unit: str | None = None
+    done: bool | None = Field(None, description="Concluir (true) ou reabrir (false).")
+
+
 # ---------------------------------------------------------------------------
 # Saídas (documentação)
 # ---------------------------------------------------------------------------
@@ -403,6 +436,35 @@ class DailyItemOut(BaseModel):
     updated_at: str
 
 
+class UserListOut(BaseModel):
+    id: str
+    account_id: str
+    name: str
+    kind: ListKind
+    created_at: str
+    updated_at: str
+
+
+class ListItemOut(BaseModel):
+    id: str
+    list_id: str
+    account_id: str
+    title: str
+    note: str
+    quantity: float | None
+    unit: str
+    position: int = Field(..., description="Ordem no ranking (menor primeiro).")
+    done: bool
+    done_at: str | None
+    created_at: str
+    updated_at: str
+
+
+class ListsOut(BaseModel):
+    lists: list[UserListOut]
+    items: list[ListItemOut]
+
+
 class BoardOut(BaseModel):
     seq: int
     account: AccountOut
@@ -416,6 +478,8 @@ class BoardOut(BaseModel):
     overload: dict
     calendar: list[CalendarEntryOut]
     daily: list[DailyItemOut]
+    lists: list[UserListOut] = Field(..., description="Listas da conta (vazio no quadro de outra conta: são privadas).")
+    list_items: list[ListItemOut]
 
 
 class ChangesOut(BaseModel):

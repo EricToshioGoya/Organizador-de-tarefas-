@@ -6,6 +6,7 @@ com `occurred_at` mais antigo que a já aplicada é descartada — prevalece a m
 
 from __future__ import annotations
 
+import math
 from datetime import timedelta
 from pathlib import Path
 from typing import Iterable
@@ -13,14 +14,20 @@ from typing import Iterable
 from ..domain import calendar, rules
 from ..domain.constants import (
     DEFAULT_DIFFICULTY,
+    DEFAULT_LIST_KIND,
     DEFAULT_PHASE,
     DEFAULT_PRIORITY,
     DONE,
     GOAL_DONE,
+    LIST_ITEMS_MAX,
+    LIST_KINDS,
+    LISTS_MAX,
+    QUANTITY_MAX,
     TEXT_MAX,
     TITLE_MAX,
+    UNIT_MAX,
 )
-from ..domain.models import Account, CalendarEntry, DailyItem, Goal, Task
+from ..domain.models import Account, CalendarEntry, DailyItem, Goal, ListItem, Task, UserList
 from ..domain.rules import DomainError, not_found, read_only
 from ..domain.timeutil import date_iso, local_date, parse_date, today_in, utcnow, week_start
 from ..metrics import weekly
@@ -952,6 +959,165 @@ def delete_daily_item(ctx: Ctx, item_id: str) -> None:
         return  # já excluído (reenvio)
     _own(ctx, item.account_id)
     ctx.emit("ItemDailyExcluido", "daily", item_id, account_id=item.account_id, payload={"title": item.title})
+
+
+# ---------------------------------------------------------------------------
+# Listas: listas com nome, no modelo tarefas (como a Daily) ou ranking (posição e quantidade)
+# ---------------------------------------------------------------------------
+
+
+def _list_for_edit(ctx: Ctx, list_id: str) -> UserList:
+    user_list = repo.get_user_list(ctx.conn, list_id)
+    if user_list is None:
+        raise not_found("Lista")
+    _own(ctx, user_list.account_id)
+    return user_list
+
+
+def _list_item_for_edit(ctx: Ctx, item_id: str) -> ListItem:
+    item = repo.get_list_item(ctx.conn, item_id)
+    if item is None:
+        raise not_found("Item da lista")
+    _own(ctx, item.account_id)
+    return item
+
+
+def _list_kind(value: object) -> str:
+    if value not in LIST_KINDS:
+        raise DomainError("Modelo de lista inválido.", code="modelo_invalido")
+    return value  # type: ignore[return-value]
+
+
+def _quantity(value: object) -> int | float | None:
+    """Quantidade opcional, maior que zero; até três casas decimais (ex.: 1,5 kg)."""
+    if value is None:
+        return None
+    number = round(float(value), 3)  # type: ignore[arg-type]
+    if not math.isfinite(number) or not 0 < number <= QUANTITY_MAX:
+        raise DomainError("A quantidade deve ser maior que zero.", code="quantidade_invalida")
+    return int(number) if number.is_integer() else number
+
+
+def _unit(value: object) -> str:
+    return rules.clean_text(value or "", UNIT_MAX, multiline=False)
+
+
+def create_user_list(ctx: Ctx, account_id: str, data: dict) -> UserList:
+    """Só a própria conta cria (e vê) as suas listas."""
+    _own(ctx, account_id)
+    list_id = clean_id(data.get("id")) or new_id()
+    existing = repo.get_user_list(ctx.conn, list_id)
+    if existing is not None:
+        if existing.account_id == account_id:
+            return existing  # reenvio da fila offline (RF71)
+        raise DomainError("Identificador de lista já utilizado.", code="conflito", status=409)
+    if len(repo.list_user_lists(ctx.conn, account_id)) >= LISTS_MAX:
+        raise DomainError(f"Limite de {LISTS_MAX} listas por conta.", code="limite_listas")
+    payload = {"name": rules.clean_name(data.get("name")), "kind": _list_kind(data.get("kind") or DEFAULT_LIST_KIND)}
+    ctx.emit("ListaCriada", "list", list_id, account_id=account_id, payload=payload)
+    return repo.get_user_list(ctx.conn, list_id)  # type: ignore[return-value]
+
+
+def update_user_list(ctx: Ctx, list_id: str, changes: dict) -> UserList:
+    """Nome e modelo; em conflito, vale a alteração mais recente de cada campo (RN30)."""
+    user_list = _list_for_edit(ctx, list_id)
+    stamps = repo.user_list_field_ts(ctx.conn, list_id)
+    cleaners = {"name": rules.clean_name, "kind": _list_kind}
+    current = {"name": user_list.name, "kind": user_list.kind}
+    diff: dict[str, dict] = {}
+    for field, clean in cleaners.items():
+        if field in changes and _newer(ctx, stamps, field):
+            value = clean(changes[field])
+            if value != current[field]:
+                diff[field] = {"old": current[field], "new": value}
+    if diff:
+        ctx.emit("ListaEditada", "list", list_id, account_id=user_list.account_id, payload={"changes": diff})
+    return repo.get_user_list(ctx.conn, list_id)  # type: ignore[return-value]
+
+
+def delete_user_list(ctx: Ctx, list_id: str) -> None:
+    """Exclui a lista com todos os itens."""
+    user_list = repo.get_user_list(ctx.conn, list_id)
+    if user_list is None:
+        return  # já excluída (reenvio)
+    _own(ctx, user_list.account_id)
+    count = len(repo.list_items_of_list(ctx.conn, list_id))
+    ctx.emit("ListaExcluida", "list", list_id, account_id=user_list.account_id, payload={"name": user_list.name, "items": count})
+
+
+def reorder_list_items(ctx: Ctx, list_id: str, order: list[str]) -> list[ListItem]:
+    """Ranking: os itens informados vão para o topo, na ordem dada; os demais seguem na ordem atual."""
+    user_list = _list_for_edit(ctx, list_id)
+    current = [i.id for i in repo.list_items_of_list(ctx.conn, list_id)]
+    wanted = [iid for iid in dict.fromkeys(order or []) if iid in current]
+    wanted += [iid for iid in current if iid not in wanted]
+    stamps = repo.user_list_field_ts(ctx.conn, list_id)
+    if wanted != current and _newer(ctx, stamps, "order"):
+        ctx.emit("ItensListaReordenados", "list", list_id, account_id=user_list.account_id, payload={"order": wanted})
+    return repo.list_items_of_list(ctx.conn, list_id)
+
+
+def create_list_item(ctx: Ctx, list_id: str, data: dict) -> ListItem:
+    """Sem posição, o item entra no fim do ranking."""
+    user_list = _list_for_edit(ctx, list_id)
+    item_id = clean_id(data.get("id")) or new_id()
+    existing = repo.get_list_item(ctx.conn, item_id)
+    if existing is not None:
+        if existing.account_id == user_list.account_id:
+            return existing  # reenvio da fila offline (RF71)
+        raise DomainError("Identificador de item já utilizado.", code="conflito", status=409)
+    items = repo.list_items_of_list(ctx.conn, list_id)
+    if len(items) >= LIST_ITEMS_MAX:
+        raise DomainError(f"Limite de {LIST_ITEMS_MAX} itens por lista.", code="limite_itens")
+    position = data.get("position")
+    payload = {
+        "list_id": list_id,
+        "title": rules.clean_title(data.get("title")),
+        "note": rules.clean_text(data.get("note") or "", TEXT_MAX),
+        "quantity": _quantity(data.get("quantity")),
+        "unit": _unit(data.get("unit")),
+        "position": max((i.position for i in items), default=-1) + 1 if position is None else int(position),
+    }
+    ctx.emit("ItemListaCriado", "list_item", item_id, account_id=user_list.account_id, payload=payload)
+    return repo.get_list_item(ctx.conn, item_id)  # type: ignore[return-value]
+
+
+def update_list_item(ctx: Ctx, item_id: str, changes: dict) -> ListItem:
+    """Título, anotação, quantidade, unidade e conclusão; vale a alteração mais recente de cada campo (RN30)."""
+    item = _list_item_for_edit(ctx, item_id)
+    stamps = repo.list_item_field_ts(ctx.conn, item_id)
+    cleaners = {
+        "title": rules.clean_title,
+        "note": lambda v: rules.clean_text(v or "", TEXT_MAX),
+        "quantity": _quantity,
+        "unit": _unit,
+    }
+    current = {"title": item.title, "note": item.note, "quantity": item.quantity, "unit": item.unit}
+    diff: dict[str, dict] = {}
+    for field, clean in cleaners.items():
+        if field in changes and _newer(ctx, stamps, field):
+            value = clean(changes[field])
+            if value != current[field]:
+                diff[field] = {"old": current[field], "new": value}
+    if diff:
+        ctx.emit("ItemListaEditado", "list_item", item_id, account_id=item.account_id, payload={"changes": diff})
+    if "done" in changes and _newer(ctx, stamps, "done") and bool(changes["done"]) != item.done:
+        ctx.emit(
+            "ItemListaConcluido" if changes["done"] else "ItemListaReaberto",
+            "list_item",
+            item_id,
+            account_id=item.account_id,
+            payload={"title": diff.get("title", {}).get("new", item.title)},
+        )
+    return repo.get_list_item(ctx.conn, item_id)  # type: ignore[return-value]
+
+
+def delete_list_item(ctx: Ctx, item_id: str) -> None:
+    item = repo.get_list_item(ctx.conn, item_id)
+    if item is None:
+        return  # já excluído (reenvio)
+    _own(ctx, item.account_id)
+    ctx.emit("ItemListaExcluido", "list_item", item_id, account_id=item.account_id, payload={"title": item.title})
 
 
 # ---------------------------------------------------------------------------

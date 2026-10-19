@@ -27,12 +27,18 @@ def test_demo_seed_builds_consistent_history(settings_env):
         assert all(repo.list_calendar_entries(conn, a.id) for a in accounts)
         daily = repo.list_daily_items(conn, member.id)
         assert len(daily) == 7 and sum(i.done for i in daily) == 3
+        lists = repo.list_user_lists(conn, member.id)
+        items = repo.list_items_of_account(conn, member.id)
+        assert [(lst.name, lst.kind) for lst in lists] == [("Lista de compras", "ranking"), ("Ideias", "tarefas")]
+        assert len(items) == 9 and sum(i.done for i in items) == 2 and any(i.quantity and i.unit for i in items)
         with db.write_transaction(conn):
             projector.rebuild_projections(conn)
         rebuilt = repo.list_tasks(conn, member.id)
         assert [(t.id, t.status, t.due_date, len(t.steps)) for t in sorted(rebuilt, key=lambda t: t.id)] == snapshot
         assert repo.list_calendar_entries(conn, member.id) == agenda
         assert repo.list_daily_items(conn, member.id) == daily
+        assert repo.list_user_lists(conn, member.id) == lists
+        assert repo.list_items_of_account(conn, member.id) == items
     finally:
         conn.close()
 

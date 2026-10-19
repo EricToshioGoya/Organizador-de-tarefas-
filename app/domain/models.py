@@ -1,4 +1,4 @@
-"""Modelos do domínio (seção 2.2 — tarefa; 2.8 — meta; 2.7 — conta; evento do calendário; item da Daily)."""
+"""Modelos do domínio (seção 2.2 — tarefa; 2.8 — meta; 2.7 — conta; evento do calendário; item da Daily; listas)."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from datetime import date, datetime
 from .constants import (
     DEFAULT_CALENDAR_COLOR,
     DEFAULT_DIFFICULTY,
+    DEFAULT_LIST_KIND,
     DEFAULT_PHASE,
     DEFAULT_PRIORITY,
     DONE,
@@ -136,6 +137,39 @@ class DailyItem:
     title: str
     day: date
     note: str = ""
+    done: bool = False
+    done_at: datetime | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class UserList:
+    """Lista com nome (ex.: "Lista de compras"), visível só para a própria conta.
+
+    `kind` define o modelo: "tarefas" (como a Daily) ou "ranking" (itens em posição reordenável, com quantidade).
+    """
+
+    id: str
+    account_id: str
+    name: str
+    kind: str = DEFAULT_LIST_KIND
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+
+
+@dataclass
+class ListItem:
+    """Item de uma lista. `position` ordena o ranking; quantidade e unidade são opcionais."""
+
+    id: str
+    list_id: str
+    account_id: str
+    title: str
+    note: str = ""
+    quantity: float | None = None
+    unit: str = ""
+    position: int = 0
     done: bool = False
     done_at: datetime | None = None
     created_at: datetime | None = None

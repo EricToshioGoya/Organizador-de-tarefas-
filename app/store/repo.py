@@ -8,7 +8,7 @@ from collections import defaultdict
 from datetime import date
 from typing import Iterable
 
-from ..domain.models import Account, CalendarEntry, DailyItem, Goal, Step, Task
+from ..domain.models import Account, CalendarEntry, DailyItem, Goal, ListItem, Step, Task, UserList
 from ..domain.timeutil import parse_date, parse_iso
 
 
@@ -409,6 +409,83 @@ def list_daily_items(conn: sqlite3.Connection, account_id: str) -> list[DailyIte
 
 def daily_field_ts(conn: sqlite3.Connection, item_id: str) -> dict:
     row = conn.execute("SELECT field_ts FROM daily_items WHERE id = ?", (item_id,)).fetchone()
+    return _json(row["field_ts"], {}) if row else {}
+
+
+# ---------------------------------------------------------------------------
+# Listas
+# ---------------------------------------------------------------------------
+
+
+def user_list_from_row(row: sqlite3.Row) -> UserList:
+    return UserList(
+        id=row["id"],
+        account_id=row["account_id"],
+        name=row["name"],
+        kind=row["kind"],
+        created_at=parse_iso(row["created_at"]),
+        updated_at=parse_iso(row["updated_at"]),
+    )
+
+
+def list_item_from_row(row: sqlite3.Row) -> ListItem:
+    return ListItem(
+        id=row["id"],
+        list_id=row["list_id"],
+        account_id=row["account_id"],
+        title=row["title"],
+        note=row["note"],
+        quantity=row["quantity"],
+        unit=row["unit"],
+        position=row["position"],
+        done=bool(row["done"]),
+        done_at=parse_iso(row["done_at"]),
+        created_at=parse_iso(row["created_at"]),
+        updated_at=parse_iso(row["updated_at"]),
+    )
+
+
+def get_user_list(conn: sqlite3.Connection, list_id: str | None) -> UserList | None:
+    if not list_id:
+        return None
+    row = conn.execute("SELECT * FROM lists WHERE id = ?", (list_id,)).fetchone()
+    return user_list_from_row(row) if row else None
+
+
+def list_user_lists(conn: sqlite3.Connection, account_id: str) -> list[UserList]:
+    rows = conn.execute("SELECT * FROM lists WHERE account_id = ? ORDER BY created_at, id", (account_id,)).fetchall()
+    return [user_list_from_row(r) for r in rows]
+
+
+def get_list_item(conn: sqlite3.Connection, item_id: str | None) -> ListItem | None:
+    if not item_id:
+        return None
+    row = conn.execute("SELECT * FROM list_items WHERE id = ?", (item_id,)).fetchone()
+    return list_item_from_row(row) if row else None
+
+
+def list_items_of_list(conn: sqlite3.Connection, list_id: str) -> list[ListItem]:
+    """Itens na ordem do ranking (posição; empate pela criação)."""
+    rows = conn.execute(
+        "SELECT * FROM list_items WHERE list_id = ? ORDER BY position, created_at, id", (list_id,)
+    ).fetchall()
+    return [list_item_from_row(r) for r in rows]
+
+
+def list_items_of_account(conn: sqlite3.Connection, account_id: str) -> list[ListItem]:
+    rows = conn.execute(
+        "SELECT * FROM list_items WHERE account_id = ? ORDER BY list_id, position, created_at, id", (account_id,)
+    ).fetchall()
+    return [list_item_from_row(r) for r in rows]
+
+
+def user_list_field_ts(conn: sqlite3.Connection, list_id: str) -> dict:
+    row = conn.execute("SELECT field_ts FROM lists WHERE id = ?", (list_id,)).fetchone()
+    return _json(row["field_ts"], {}) if row else {}
+
+
+def list_item_field_ts(conn: sqlite3.Connection, item_id: str) -> dict:
+    row = conn.execute("SELECT field_ts FROM list_items WHERE id = ?", (item_id,)).fetchone()
     return _json(row["field_ts"], {}) if row else {}
 
 

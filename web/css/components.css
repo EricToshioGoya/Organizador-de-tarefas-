@@ -308,19 +308,19 @@
   }
 }
 
-/* Sete abas no cabeçalho: abaixo de 1520 px (largura que o Gestor precisa) as abas ficam sem ícone e,
-   abaixo de 1360 px, somem também o nome da marca e os textos dos botões, para caber numa linha. */
+/* Oito abas no cabeçalho: abaixo de 1640 px (largura que o Gestor precisa) as abas ficam sem ícone e,
+   abaixo de 1460 px, somem também o nome da marca e os textos dos botões, para caber numa linha. */
 .nav-tab > svg {
   flex-shrink: 0;
 }
 
-@media (min-width: 901px) and (max-width: 1519px) {
+@media (min-width: 901px) and (max-width: 1639px) {
   .nav-tab > svg {
     display: none;
   }
 }
 
-@media (min-width: 901px) and (max-width: 1359px) {
+@media (min-width: 901px) and (max-width: 1459px) {
   .brand-name,
   .hide-compact {
     display: none !important;
@@ -3711,6 +3711,317 @@ input[type="time"].input {
     margin: 0;
   }
 
+}
+
+/* ------------------------------------------------------------------------------------------
+   Listas: listas com nome nos modelos Tarefas e Ranking. Reaproveitam as linhas da Daily (.daily-*);
+   aqui ficam a navegação entre listas, o ranking (posição, arrastar) e a quantidade.
+   ------------------------------------------------------------------------------------------ */
+
+.lists-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.lists-nav {
+  position: sticky;
+  top: calc(var(--header-h) + 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
+  background: var(--surface-cream);
+  border: 1px solid var(--border-cream);
+  border-radius: var(--radius-lg);
+}
+
+.lists-nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lists-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--text-md);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.lists-nav-item > svg {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+
+.lists-nav-item[aria-current="page"] {
+  color: var(--text-1);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-1);
+}
+
+.lists-nav-item[aria-current="page"] > svg {
+  color: var(--text-1);
+}
+
+.lists-nav-new {
+  margin-top: 4px;
+  color: var(--text-3);
+}
+
+.lists-toolbar {
+  gap: 8px 10px;
+  min-height: 74px;
+}
+
+.lists-toolbar .daily-date {
+  min-width: 0;
+}
+
+.lists-add .lists-add-qty {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.lists-add .lists-add-qty .input {
+  width: 76px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.list-item-row {
+  position: relative;
+}
+
+.list-item-row.dragging {
+  opacity: 0.35;
+}
+
+.list-item-row.drop-before::before,
+.list-item-row.drop-after::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 12px;
+  right: 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.list-item-row.drop-before::before {
+  top: -1px;
+}
+
+.list-item-row.drop-after::after {
+  bottom: -1px;
+}
+
+.lists-block.is-ranking .daily-row {
+  padding-left: 8px;
+}
+
+.list-rank {
+  min-width: 28px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.qty-stepper {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 2px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-full);
+  background: var(--surface-1);
+}
+
+.qty-stepper .icon-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.qty-value {
+  min-width: 52px;
+  padding: 0 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-align: center;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.qty-value.is-empty {
+  color: var(--text-3);
+}
+
+.lists-qty-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 180px));
+  gap: var(--space-3);
+}
+
+.list-kinds {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.list-kind {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-1);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.list-kind input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.list-kind.is-selected {
+  border-color: var(--border-focus);
+  background: var(--surface-sunken);
+}
+
+.list-kind:focus-within {
+  box-shadow: var(--focus-ring);
+}
+
+.list-kind-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--surface-track);
+  color: var(--text-1);
+}
+
+@media (hover: hover) {
+  .lists-nav-item:hover:not([aria-current="page"]) {
+    color: var(--text-1);
+    background: var(--surface-hover);
+  }
+
+  .list-kind:hover:not(.is-selected) {
+    border-color: var(--border-strong);
+  }
+}
+
+/* Celular e tablet: as listas viram uma faixa rolável acima da lista aberta. */
+@media (max-width: 900px) {
+  .lists-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .lists-nav {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 6px;
+  }
+
+  .lists-nav-items {
+    flex-direction: row;
+  }
+
+  .lists-nav-item {
+    width: auto;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .lists-nav-item .truncate {
+    max-width: 180px;
+  }
+}
+
+@media (max-width: 560px) {
+  .lists-add {
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+  }
+
+  .lists-add .daily-add-input {
+    flex-basis: calc(100% - 34px);
+  }
+
+  .lists-add .lists-add-qty {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-left: 34px;
+  }
+
+  .lists-add .lists-add-qty .input {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .lists-block.is-ranking .daily-row {
+    gap: 8px;
+    padding-left: 4px;
+  }
+
+  .list-rank {
+    min-width: 22px;
+  }
+
+  /* Sem espaço para os botões − / +: a quantidade fica visível e é editada nos detalhes do item */
+  .qty-stepper {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .qty-stepper .icon-btn {
+    display: none;
+  }
+
+  .qty-value {
+    min-width: 0;
+    color: var(--text-2);
+  }
+
+  .lists-qty-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* Ícones com a cor do significado (atrasada, vence hoje, concluída, destaque). Ficam no fim do arquivo
